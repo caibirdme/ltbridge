@@ -1,0 +1,5 @@
+/target
+/data
+*.log
+# don't know how to keep prost from generating this file
+src/proto/opentelemetry.proto.resource.v1.rs

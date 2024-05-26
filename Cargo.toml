@@ -1,0 +1,76 @@
+[package]
+name = "ltbridge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76.0"
+authors = ["caibirdme <492877816@qq.com>"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+members = [
+    ".",
+    "logql",
+    "traceql"
+]
+
+[dependencies]
+logql = {path = "logql"}
+traceql = {path = "traceql"}
+anyhow = "1.0.86"
+async-trait = "0.1.80"
+axum = { version = "0.7.5", features = ["default"] }
+axum-extra = { version = "0.9.3", features = ["protobuf"] }
+axum-valid = "0.18.0"
+chrono = { version = "0.4.38", features = ["serde"] }
+config = { version = "0.14.0" }
+databend-driver = { version = "0.18.1"}
+dyn-clone = "1.0.17"
+hex = { version = "0.4.3" }
+http = "1.1.0"
+humantime-serde = { version = "1.1.1" }
+itertools = { version = "0.13.0" }
+moka = { version = "0.12.7", features = ["default", "sync"] }
+opentelemetry = { version = "0.23.0", features = ["metrics"] }
+opentelemetry-prometheus = "0.16.0"
+opentelemetry-proto = { version = "0.6.0", features = ["full"] }
+opentelemetry-semantic-conventions = { version = "0.15.0" }
+opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
+ordered-float = { version = "4.2.0" }
+prometheus = "0.13.4"
+prost = { version = "0.12.6" }
+reqwest = { version = "0.12.4", features = ["json"] }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.117" }
+serde_with = { version = "3.8.1", features = ["json"] }
+thiserror = { version = "1.0.61" }
+tokio = { version = "1.37.0", features = ["full"] }
+tokio-stream = { version = "0.1.15" }
+tower = { version = "0.4.13" }
+tower-http = { version = "0.5.2", features = [
+    "trace",
+    "timeout",
+    "compression-gzip",
+    "decompression-gzip",
+] }
+tracing = { version = "0.1.40" }
+tracing-subscriber = { version = "0.3.18", features = [
+    "default",
+    "env-filter",
+    "json",
+] }
+url = "2.5.0"
+validator = { version = "0.18.1", features = ["derive"] }
+
+[target.'cfg(target_env = "musl")'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"
+serde_urlencoded = "0.7.1"
+serde_yaml = "0.9.34"
+sqlparser = "0.46.0"
+
+[build-dependencies]
+anyhow = "1.0.82"
+prost-build = {version = "0.12.6",features = ["default", "cleanup-markdown"]}

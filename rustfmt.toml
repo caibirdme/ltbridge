@@ -1,0 +1,12 @@
+# Basic
+hard_tabs = true
+max_width = 80
+use_small_heuristics = "Default"
+edition = "2021"
+
+# Imports
+reorder_imports = true
+
+# Others
+use_field_init_shorthand = true
+use_try_shorthand = true

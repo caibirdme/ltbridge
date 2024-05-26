@@ -1,0 +1,111 @@
+three_spansets:
+  input: '{resource.app="camp" && serviceName="fooSvc"} && ({span.qwe="qqq"} || {foo>10})'
+  limit: 10
+  expect: |
+    SELECT sp.ts,
+          sp.trace_id,
+          sp.span_id,
+          sp.parent_span_id,
+          sp.trace_state,
+          sp.span_name,
+          sp.span_kind,
+          sp.service_name,
+          sp.resource_attributes,
+          sp.scope_name,
+          sp.scope_version,
+          sp.span_attributes,
+          sp.duration,
+          sp.status_code,
+          sp.status_message,
+          sp.span_events,
+          sp.links
+    FROM spans sp
+    WHERE sp.span_id IN
+        (SELECT span_id
+        FROM (
+                (SELECT span_id,
+                        trace_id
+                  FROM spans
+                  WHERE (resource_attributes['app'] = 'camp'
+                        AND service_name = 'fooSvc'))
+              UNION
+                (SELECT span_id,
+                        trace_id
+                  FROM spans
+                  WHERE span_attributes['qwe'] = 'qqq')
+              UNION
+                (SELECT span_id,
+                        trace_id
+                  FROM spans
+                  WHERE (span_attributes['foo'] > 10 OR resource_attributes['foo']>10))) AS sub
+        WHERE (sub.trace_id IN
+                      (SELECT trace_id
+                        FROM spans
+                        WHERE (resource_attributes['app'] = 'camp'
+                              AND service_name = 'fooSvc'))
+                    AND (sub.trace_id IN
+                            (SELECT trace_id
+                            FROM spans
+                            WHERE span_attributes['qwe'] = 'qqq')
+                          OR sub.trace_id IN
+                            (SELECT trace_id
+                            FROM spans
+                            WHERE (span_attributes['foo'] > 10 OR resource_attributes['foo']>10))))) LIMIT 10
+
+two_spansets:
+  input: '{resource.app="camp" && serviceName="fooSvc"} && {qwe="qqq"}'
+  limit: 100
+  expect: |
+    SELECT sp.ts, sp.trace_id, sp.span_id, sp.parent_span_id, sp.trace_state
+      , sp.span_name, sp.span_kind, sp.service_name, sp.resource_attributes, sp.scope_name
+      , sp.scope_version, sp.span_attributes, sp.duration, sp.status_code, sp.status_message
+      , sp.span_events, sp.links
+    FROM spans sp
+    WHERE sp.span_id IN (
+      SELECT span_id
+      FROM (
+        (SELECT span_id, trace_id
+        FROM spans
+        WHERE (resource_attributes['app'] = 'camp'
+          AND service_name = 'fooSvc'))
+        UNION
+        (SELECT span_id, trace_id
+        FROM spans
+        WHERE (span_attributes['qwe'] = 'qqq' OR resource_attributes['qwe'] = 'qqq'))
+      ) AS sub
+      WHERE (sub.trace_id IN (
+            SELECT trace_id
+            FROM spans
+            WHERE (resource_attributes['app'] = 'camp'
+              AND service_name = 'fooSvc')
+          )
+          AND sub.trace_id IN (
+            SELECT trace_id
+            FROM spans
+            WHERE (span_attributes['qwe'] = 'qqq' OR resource_attributes['qwe'] = 'qqq')
+          ))) LIMIT 100
+with_duration_and_status:
+  input: '{resource.app="camp" && duration > 90s && status!=ok}'
+  limit: 100
+  expect: |
+    SELECT sp.ts, sp.trace_id, sp.span_id, sp.parent_span_id, sp.trace_state
+      , sp.span_name, sp.span_kind, sp.service_name, sp.resource_attributes, sp.scope_name
+      , sp.scope_version, sp.span_attributes, sp.duration, sp.status_code, sp.status_message
+      , sp.span_events, sp.links
+    FROM spans sp
+    WHERE sp.span_id IN (
+      SELECT span_id
+      FROM (
+        (SELECT span_id, trace_id
+        FROM spans
+        WHERE (resource_attributes['app'] = 'camp'
+          AND (duration > 90000000000
+          AND status_code != 1)))
+      ) AS sub
+      WHERE sub.trace_id IN (
+            SELECT trace_id
+            FROM spans
+            WHERE (resource_attributes['app'] = 'camp'
+              AND (duration > 90000000000
+              AND status_code != 1))
+          )) LIMIT 100

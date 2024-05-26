@@ -1,0 +1,41 @@
+services:
+  minio:
+    image: minio/minio
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: rootuser
+      MINIO_ROOT_PASSWORD: pwdpwdpwd
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ./data:/data
+    command: server /data --console-address ":9001"
+
+  databend:
+    image: datafuselabs/databend:v1.2.456-nightly
+    container_name: databend
+    environment:
+      QUERY_DEFAULT_USER: databend
+      QUERY_DEFAULT_PASSWORD: databend
+      QUERY_STORAGE_TYPE: s3
+      AWS_S3_ENDPOINT: http://minio:9000
+      AWS_S3_BUCKET: databend
+      AWS_ACCESS_KEY_ID: rootuser
+      AWS_SECRET_ACCESS_KEY: pwdpwdpwd
+    ports:
+      - "3306:8000"
+    depends_on:
+      - minio
+
+  grafana:
+    image: grafana/grafana:10.4.2-ubuntu
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - databend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

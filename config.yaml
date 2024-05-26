@@ -1,0 +1,35 @@
+server:
+  listen_addr: 0.0.0.0:6778
+  timeout: 30s
+  log:
+    level: info
+    file: info.log
+    # for more details about filter_directives
+    # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+    filter_directives: info,tower_http=off,databend_client=off
+log_source:
+  quickwit:
+    domain: http://127.0.0.1:7280
+    index: otel-logs-v0_7
+    timeout: 30s
+  # databend:
+  #   drvier: databend
+  #   domain: localhost
+  #   port: 3306
+  #   database: test_log
+  #   username: databend
+  #   password: databend
+  #   # use fulltext index(if you have databend commercial license), otherwise false
+  #   inverted_index: true
+trace_source:
+  quickwit:
+    domain: http://127.0.0.1:7280
+    index: otel-traces-v0_7
+    timeout: 30s
+  # databend:
+  #   drvier: databend
+  #   domain: localhost
+  #   port: 3306
+  #   database: test_log
+  #   username: databend
+  #   password: databend
