@@ -12,5 +12,5 @@ updates:
       time: "20:20"
       timezone: "Asia/Shanghai"
     open-pull-requests-limit: 10
-    versioning-strategy: increase
+    versioning-strategy: auto
     
