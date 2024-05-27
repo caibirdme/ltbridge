@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -26,8 +26,11 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: clippy
-        args: -- -D warnings
+        args: --target x86_64-unknown-linux-musl -- -D warnings
+        use-cross: true
     - name: Unit Test
       uses: actions-rs/cargo@v1
       with:
         command: test
+        use-cross: true
+        args: --target x86_64-unknown-linux-musl
