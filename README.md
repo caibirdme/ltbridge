@@ -15,6 +15,8 @@ This project, named **ltbridge**, implements the HTTP interfaces of Grafana Loki
 
 ## Current Progress
 
+### This project is under active development, don't use it in production for now
+
 - **Databend Storage:** Implemented and functional, but requires polishing.
 - **Quickwit Storage:** Implemented and functional, but requires polishing.
 
@@ -31,7 +33,7 @@ This project, named **ltbridge**, implements the HTTP interfaces of Grafana Loki
 
 ## Quick Start
 
-**Install Rust and Cross-rs:**
+### Install Rust and Cross-rs
 
 ```bash
 # Install Rust
@@ -41,16 +43,16 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install cross
 ```
 
-**Build the Project:**
+### Build the Project
 
 ```bash
 cross build --target x86_64-unknown-linux-gnu
 ```
 
-**Quickly start an environment for testing:**
+### Quickly start an environment for testing
 
 1. **Databend Environment**: Includes MinIO, Databend, Grafana, and pre-configured Loki and Tempo data sources in Grafana
-2. **Quickwit Environment**: Includes MinIO, Quickwit, Grafana, and pre-configured Loki and Tempo data sources in Grafana
+2. **Quickwit Environment**: Includes MinIO, Quickwit, Postgres, Opentelemetry-Collector, Grafana, and pre-configured Loki and Tempo data sources in Grafana
 
 ```bash
 cd devenv
@@ -62,7 +64,164 @@ docker compose up -f docker-compose-databend.yaml
 docker compose up -f docker-compose-quickwit.yaml
 ```
 
-**Note:** You need to run ltbridge locally and listen on port 6778 so that the processes in Docker can access it via `http://host.docker.internal:6778`.
+### Quickwit Settings
+
+If you're trying quickwit, see this, or see databend section
+
+#### Create minio bucket for quickwit to store data
+
+- open `http://127.0.0.1:9001` in browser
+- login: see [docker-compose file](./devenv/docker-compose-quickwit.yaml) for username and password
+- create bucket named `quickwit`
+
+#### Start ltbridge
+
+create config.yaml:
+
+```yaml
+server:
+  listen_addr: 0.0.0.0:6778
+  timeout: 30s
+  log:
+    level: info
+    file: info.log
+    # for more details about filter_directives
+    # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+    filter_directives: info,tower_http=off,databend_client=off
+log_source:
+  quickwit:
+    domain: http://127.0.0.1:7280
+    index: otel-logs-v0_7
+    timeout: 30s
+trace_source:
+  quickwit:
+    domain: http://127.0.0.1:7280
+    index: otel-traces-v0_7
+    timeout: 30s
+
+```
+
+start the server:
+
+```bash
+./target/x86_64-unknown-linux-gnu/release/ltbridge
+```
+
+### Databend Settings
+
+#### Create database and tables
+
+##### Install bendsql
+
+```bash
+cargo binstall bendsql
+```
+
+Or Look at [bendsql](https://github.com/datafuselabs/bendsql) for more installation.
+
+##### Create database and tables
+
+login:
+```bash
+bendsql -udatabend -pdatabend -P3306 # user&pwd are set in docker-compose file
+```
+
+create database
+
+```sql
+create database test_ltbridge;
+use test_ltbridge;
+```
+
+create log table
+
+```sql
+CREATE TABLE logs (
+    app STRING NOT NULL,
+    server STRING NOT NULL,
+    trace_id STRING,
+    span_id STRING,
+    level TINYINT,
+    resources MAP(STRING, STRING) NOT NULL,
+    attributes MAP(STRING, STRING) NOT NULL,
+    message STRING NOT NULL,
+    ts TIMESTAMP NOT NULL
+) ENGINE=FUSE CLUSTER BY(TO_YYYYMMDDHH(ts), server);
+CREATE INVERTED INDEX message_idx ON logs(message);
+```
+
+create trace table
+
+```sql
+CREATE TABLE spans (
+	ts TIMESTAMP NOT NULL,
+    trace_id STRING NOT NULL,
+	span_id STRING NOT NULL,
+	parent_span_id STRING,
+	trace_state STRING NOT NULL,
+	span_name STRING NOT NULL,
+	span_kind TINYINT,
+	service_name STRING DEFAULT 'unknown',
+	resource_attributes Map(STRING, Variant) NOT NULL,
+	scope_name STRING,
+	scope_version STRING,
+	span_attributes Map(STRING, Variant),
+	duration BIGINT,
+	status_code INT32,
+	status_message STRING,
+	span_events Variant,
+	links Variant
+) ENGINE = FUSE CLUSTER BY (TO_YYYYMMDDHH(ts));
+```
+
+#### Start ltbridge
+
+```yaml
+server:
+  listen_addr: 0.0.0.0:6778
+  timeout: 30s
+  log:
+    level: info
+    file: info.log
+    # for more details about filter_directives
+    # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+    filter_directives: info,tower_http=off,databend_client=off
+log_source:
+  databend:
+    drvier: databend
+    domain: localhost
+    port: 3306
+    database: test_ltbridge
+    username: databend
+    password: databend
+    # use fulltext index(if you have databend commercial license), otherwise false
+    inverted_index: true
+trace_source:
+  databend:
+    drvier: databend
+    domain: localhost
+    port: 3306
+    database: test_ltbridge
+    username: databend
+    password: databend
+```
+
+```bash
+./target/x86_64-unknown-linux-gnu/release/ltbridge
+```
+
+**Note:** You must run ltbridge locally and listen on port 6778(predefined for the grafana datasource) so that the processes in Docker can access it via `http://host.docker.internal:6778`.
+
+### Try search in grafana
+
+- open grafana: localhost:3000
+- navigate to expore
+- choose Loki | Tempo
+- Have fun!
+
+**Note:** Before you search, you must send some data into quickwit or databend. Below are some tools that may help:
+
+- [telemetrygen](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/cmd/telemetrygen)
 
 ## Contributing
 
