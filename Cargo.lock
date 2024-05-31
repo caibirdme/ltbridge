@@ -774,9 +774,9 @@ dependencies = [
 
 [[package]]
 name = "databend-client"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ac434f97bd6a86893f1491151c4e597b9534b0941ccfd4cb21e0bdc68b6bf5b"
+checksum = "8afe21f4ac2e61c9360d5c1b7cce3ed4392c2a42c6c1dbb1115cc27f25f23b78"
 dependencies = [
  "async-trait",
  "log",
@@ -795,9 +795,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7756d724be7b6a2193153e52dfecd96b2ae21c38a868a2198020fbf20f0abae"
+checksum = "0de28036a0e61741a102070534a6884500de38c2e4185caddbd059e72f29b997"
 dependencies = [
  "arrow",
  "async-compression",
@@ -820,9 +820,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver-macros"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "059366dbd68a3111231b9e95ce3343c7232b0f98542026998b951a0f2aca8e1b"
+checksum = "819ace73639cfa1900a196dfd593cb584adb4cade37d36e01b5374c34538dfcd"
 dependencies = [
  "quote",
  "syn 2.0.53",
@@ -830,9 +830,9 @@ dependencies = [
 
 [[package]]
 name = "databend-sql"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db20230946dcc43eb6c9143851f828cfaa4ea33ae415444bd340370f02a9d50"
+checksum = "8d77c324dc851433234104b1c33eaef83a62ef41fde42c6ebb4130b790060b25"
 dependencies = [
  "arrow",
  "chrono",

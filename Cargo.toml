@@ -23,7 +23,7 @@ axum-extra = { version = "0.9.3", features = ["protobuf"] }
 axum-valid = "0.18.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 config = { version = "0.14.0" }
-databend-driver = { version = "0.18.2"}
+databend-driver = { version = "0.18.3"}
 dyn-clone = "1.0.17"
 hex = { version = "0.4.3" }
 http = "1.1.0"
