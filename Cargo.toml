@@ -43,7 +43,7 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.117" }
 serde_with = { version = "3.8.1", features = ["json"] }
 thiserror = { version = "1.0.61" }
-tokio = { version = "1.37.0", features = ["full"] }
+tokio = { version = "1.38.0", features = ["full"] }
 tokio-stream = { version = "0.1.15" }
 tower = { version = "0.4.13" }
 tower-http = { version = "0.5.2", features = [
