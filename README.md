@@ -3,6 +3,7 @@
 ![CI](https://github.com/caibirdme/ltbridge/actions/workflows/prcheck.yaml/badge.svg)
 [![Docker](https://github.com/caibirdme/ltbridge/actions/workflows/docker-latest.yml/badge.svg)](https://github.com/caibirdme/ltbridge/pkgs/container/ltbridge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![dependency status](https://deps.rs/repo/github/caibirdme/ltbridge/status.svg)](https://deps.rs/repo/github/caibirdme/ltbridge)
 
 ## Overview
 
