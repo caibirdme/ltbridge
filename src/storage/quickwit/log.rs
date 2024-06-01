@@ -96,6 +96,29 @@ impl LogStorage for QuickwitLog {
 			.await?;
 		Ok(flatten_volume_agg_response(resp))
 	}
+	async fn labels(&self, opt: QueryLimits) -> Result<Vec<String>> {
+		self.cli
+			.field_caps(sdk::TimeRange {
+				start: opt.range.start,
+				end: opt.range.end,
+			})
+			.await
+	}
+	async fn label_values(
+		&self,
+		label: &str,
+		opt: QueryLimits,
+	) -> Result<Vec<String>> {
+		self.cli
+			.field_terms(
+				label,
+				sdk::TimeRange {
+					start: opt.range.start,
+					end: opt.range.end,
+				},
+			)
+			.await
+	}
 }
 
 fn flatten_volume_agg_response(
