@@ -1,0 +1,4 @@
+[submodule "devenv/quickwit/opentelemetry-demo"]
+	path = devenv/quickwit/opentelemetry-demo
+	url = https://github.com/caibirdme/opentelemetry-demo.git
+	branch = quickwit

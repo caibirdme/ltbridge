@@ -22,12 +22,13 @@ impl fmt::Display for Clause {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Clause::Term(term) => {
-				write!(
-					f,
-					"{}:{}",
-					term.field,
-					term.value.to_string().trim_matches('"')
-				)
+				let v = term.value.to_string();
+				let val = v.trim_matches('"');
+				if is_valid_string(val) {
+					write!(f, "{}:{}", term.field, val)
+				} else {
+					write!(f, "{}:\"{}\"", term.field, val)
+				}
 			}
 			Clause::Phrase(phrase) => {
 				write!(f, "{}:\"{}\"", phrase.field, phrase.value)
@@ -35,6 +36,13 @@ impl fmt::Display for Clause {
 			Clause::Defaultable(d) => write!(f, "{}", d.clone()),
 		}
 	}
+}
+
+// https://quickwit.io/docs/configuration/index-config#field-name-validation-rules
+fn is_valid_string(input: &str) -> bool {
+	input
+		.chars()
+		.all(|c| c.is_ascii_alphanumeric() || ".-_/@$".contains(c))
 }
 
 pub enum Unary {
@@ -103,6 +111,12 @@ mod tests {
 			(
 				Query::C(Unary::Pos(Clause::Defaultable("bar".to_string()))),
 				r#"bar"#,
+			),
+			(
+				Query::C(Unary::Pos(Clause::Defaultable(
+					"I love football".to_string(),
+				))),
+				r#"I love football"#,
 			),
 			(
 				Query::Or(

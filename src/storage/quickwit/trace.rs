@@ -41,7 +41,12 @@ impl TraceStorage for QuickwitTrace {
 			.hits
 			.into_iter()
 			.filter_map(|v| {
-				let sp: Option<QuickwitSpan> = serde_json::from_value(v).ok();
+				let sp: Option<QuickwitSpan> = serde_json::from_value(v)
+					.map_err(|e| {
+						dbg!(&e);
+						e
+					})
+					.ok();
 				sp
 			})
 			.map(Into::into)
@@ -66,25 +71,28 @@ pub struct QuickwitSpan {
 	pub ts: NaiveDateTime,
 	pub trace_id: String,
 	pub span_id: String,
-	pub parent_span_id: String,
+	pub parent_span_id: Option<String>,
 	pub trace_state: Option<String>,
 	pub span_name: String,
 	pub span_kind: i32,
 	pub service_name: String,
+	#[serde(default)]
 	pub resource_attributes: HashMap<String, JSONValue>,
 	pub scope_name: Option<String>,
 	pub scope_version: Option<String>,
+	#[serde(default)]
 	pub span_attributes: HashMap<String, JSONValue>,
 	#[serde(rename = "span_duration_millis")]
 	pub duration: i64,
 	#[serde(
 		rename = "span_status",
-		deserialize_with = "deserialize_status_code"
+		deserialize_with = "deserialize_status_code",
+		default = "default_status_code"
 	)]
 	pub status_code: Option<i32>,
 	#[serde(rename = "status_message")]
 	pub status_message: Option<String>,
-	#[serde(rename = "events")]
+	#[serde(rename = "events", default)]
 	pub span_events: Vec<QuickwitSpanEvent>,
 	#[serde(default)]
 	pub link: Vec<QuickwitLinks>,
@@ -96,7 +104,7 @@ impl From<QuickwitSpan> for SpanItem {
 			ts: val.ts,
 			trace_id: val.trace_id,
 			span_id: val.span_id,
-			parent_span_id: val.parent_span_id,
+			parent_span_id: val.parent_span_id.unwrap_or_default(),
 			trace_state: val.trace_state.unwrap_or_default(),
 			span_name: val.span_name,
 			span_kind: val.span_kind,
@@ -157,6 +165,7 @@ pub struct QuickwitSpanEvent {
 		deserialize_with = "deserialize_timestamp"
 	)]
 	pub event_timestamp: NaiveDateTime,
+	#[serde(default)]
 	pub event_attributes: HashMap<String, JSONValue>,
 }
 
@@ -177,6 +186,10 @@ where
 {
 	let nanos: i64 = Deserialize::deserialize(deserializer)?;
 	Ok(DateTime::from_timestamp_nanos(nanos).naive_utc())
+}
+
+const fn default_status_code() -> Option<i32> {
+	Some(0)
 }
 
 // Function to deserialize status code

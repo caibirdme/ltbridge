@@ -12,26 +12,33 @@ pub mod trace;
 
 #[derive(Clone, Debug)]
 pub struct QuickwitServerConfig {
-	pub endpoint: url::Url,
+	pub qw_endpoint: url::Url,
+	pub es_endpoint: url::Url,
 	pub timeout: Duration,
 }
 
+impl QuickwitServerConfig {
+	pub fn new(cfg: Quickwit) -> Result<Self> {
+		let pp = Path::new("/api/v1/").join(&cfg.index);
+		let qw_endpoint =
+			Url::parse(&cfg.domain)?.join(pp.to_str().unwrap())?;
+		let pp = Path::new("/api/v1/_elastic/").join(&cfg.index);
+		let es_endpoint =
+			Url::parse(&cfg.domain)?.join(pp.to_str().unwrap())?;
+		Ok(QuickwitServerConfig {
+			qw_endpoint,
+			es_endpoint,
+			timeout: cfg.timeout,
+		})
+	}
+}
+
 pub async fn new_log_source(cfg: Quickwit) -> Result<Box<dyn LogStorage>> {
-	let pp = Path::new("/api/v1").join(&cfg.index).join("search");
-	let endpoint = Url::parse(&cfg.domain)?.join(pp.to_str().unwrap())?;
-	let inner = log::QuickwitLog::new(QuickwitServerConfig {
-		endpoint,
-		timeout: cfg.timeout,
-	});
+	let inner = log::QuickwitLog::new(QuickwitServerConfig::new(cfg)?);
 	Ok(Box::new(inner))
 }
 
 pub async fn new_trace_source(cfg: Quickwit) -> Result<Box<dyn TraceStorage>> {
-	let pp = Path::new("/api/v1").join(&cfg.index).join("search");
-	let endpoint = Url::parse(&cfg.domain)?.join(pp.to_str().unwrap())?;
-	let inner = trace::QuickwitTrace::new(QuickwitServerConfig {
-		endpoint,
-		timeout: cfg.timeout,
-	});
+	let inner = trace::QuickwitTrace::new(QuickwitServerConfig::new(cfg)?);
 	Ok(Box::new(inner))
 }
