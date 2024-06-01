@@ -54,18 +54,25 @@ cross build --target x86_64-unknown-linux-gnu
 1. **Databend Environment**: Includes MinIO, Databend, Grafana, and pre-configured Loki and Tempo data sources in Grafana
 2. **Quickwit Environment**: Includes MinIO, Quickwit, Postgres, Opentelemetry-Collector, Grafana, and pre-configured Loki and Tempo data sources in Grafana
 
+try databend
+
 ```bash
-cd devenv/(databend|quickwit)
+cd devenv/databend
+docker compose up --force-recreate --remove-orphans --detach
+```
 
-# If you want to try quickwit, try to init submodule
-# git submodule update --init --recursive
+try quickwit
 
+```bash
+cd devenv/quickwit
+git submodule update --init --recursive
+cd opentelemetry-demo
 docker compose up --force-recreate --remove-orphans --detach
 ```
 
 ### Quickwit Settings
 
-If you're trying quickwit, see this, or see databend section
+If you're trying quickwit, see this, or jump to the databend section
 
 #### Create minio bucket for quickwit to store data
 
