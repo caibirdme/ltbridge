@@ -13,6 +13,8 @@ Grafana Loki and Tempo are excellent tools for log and trace management, providi
 
 This project, named **ltbridge**, implements the HTTP interfaces of Grafana Loki and Tempo. The "l" stands for both "log" and "Loki," while the "t" stands for both "trace" and "Tempo." The term "bridge" signifies its role as a bridge, converting different data sources into the Loki and Tempo formats. ltbridge allows you to add Loki and Tempo as data sources in Grafana, providing services as if they were native Loki or Tempo instances. Internally, it parses LogQL and TraceQL queries, converts them into equivalent SQL or other DSLs, queries the corresponding systems for data, and then transforms the data back into the Loki or Tempo format.
 
+![screenshot](./docs/pics/screenshot.png)
+
 ## Advantages
 
 1. **Leverages Grafana's Loki and Tempo Plugins:** By standing on the shoulders of giants, this project maximizes the use of Grafana's existing Loki and Tempo plugins.
