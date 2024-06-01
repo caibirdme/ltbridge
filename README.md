@@ -1,5 +1,10 @@
 # ltbridge
 
+![CI](https://github.com/caibirdme/ltbridge/actions/workflows/prcheck.yaml/badge.svg)
+[![Docker](https://github.com/caibirdme/ltbridge/actions/workflows/docker-latest.yml/badge.svg)](https://github.com/caibirdme/ltbridge/pkgs/container/ltbridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![dependency status](https://deps.rs/repo/github/caibirdme/ltbridge/status.svg)](https://deps.rs/repo/github/caibirdme/ltbridge)
+
 ## Overview
 
 Grafana Loki and Tempo are excellent tools for log and trace management, providing significant cost savings and data reliability through object storage. However, they often fall short in terms of performance. While there are many log solutions available in the market that handle writing, storing, and querying logs, most of them do not include a user-friendly UI. Developing a good user interface is a complex task. This project aims to leverage the strengths of Grafana to offer more options for observability systems.
