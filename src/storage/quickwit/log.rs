@@ -10,11 +10,21 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::DateTime;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use logql::parser::{
 	Filter, FilterType, LabelPair, LogLineFilter, LogQuery, MetricQuery,
 	Operator,
 };
 use serde_json::Value as JSONValue;
+
+static LABEL_ALIAS: [(&str, &str); 1] = [("severity_text", "level")];
+
+lazy_static! {
+	static ref LABEL_ALIAS_KV: HashMap<&'static str, &'static str> =
+		LABEL_ALIAS.iter().cloned().collect();
+	static ref LABEL_ALIAS_VK: HashMap<&'static str, &'static str> =
+		LABEL_ALIAS.iter().map(|(k, v)| (*v, *k)).collect();
+}
 
 #[derive(Clone)]
 pub struct QuickwitLog {
@@ -103,15 +113,22 @@ impl LogStorage for QuickwitLog {
 				end: opt.range.end,
 			})
 			.await
+			.map(|labels| {
+				labels
+					.into_iter()
+					.map(|k| field_alias_k_2_v(&k))
+					.collect_vec()
+			})
 	}
 	async fn label_values(
 		&self,
 		label: &str,
 		opt: QueryLimits,
 	) -> Result<Vec<String>> {
+		let aliased_label = field_alias_v_2_k(label);
 		self.cli
 			.field_terms(
-				label,
+				&aliased_label,
 				sdk::TimeRange {
 					start: opt.range.start,
 					end: opt.range.end,
@@ -270,14 +287,28 @@ fn jsonmap_to_stringmap(
 	m.into_iter().map(|(k, v)| (k, v.to_string())).collect()
 }
 
+fn field_alias_k_2_v(f: &str) -> String {
+	LABEL_ALIAS_KV
+		.get(f)
+		.map(|v| v.to_string())
+		.unwrap_or(f.to_string())
+}
+
+fn field_alias_v_2_k(f: &str) -> String {
+	LABEL_ALIAS_VK
+		.get(f)
+		.map(|v| v.to_string())
+		.unwrap_or(f.to_string())
+}
+
 fn label_pair_to_unary(p: &LabelPair) -> Unary {
 	match p.op {
 		Operator::Equal => Unary::Pos(Clause::Term(TermCtx {
-			field: p.label.clone(),
+			field: field_alias_v_2_k(&p.label),
 			value: JSONValue::String(p.value.clone()),
 		})),
 		Operator::NotEqual => Unary::Neg(Clause::Term(TermCtx {
-			field: p.label.clone(),
+			field: field_alias_v_2_k(&p.label),
 			value: JSONValue::String(p.value.clone()),
 		})),
 		_ => unimplemented!("regexp is not supported yet"),

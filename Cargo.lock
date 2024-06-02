@@ -1686,6 +1686,7 @@ dependencies = [
  "http 1.1.0",
  "humantime-serde",
  "itertools 0.13.0",
+ "lazy_static",
  "logql",
  "moka",
  "openssl",

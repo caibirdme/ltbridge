@@ -1,6 +1,6 @@
 use super::{sdk, *};
 use crate::storage::{trace::*, *};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::DateTime;
 use itertools::Itertools;
@@ -41,12 +41,8 @@ impl TraceStorage for QuickwitTrace {
 			.hits
 			.into_iter()
 			.filter_map(|v| {
-				let sp: Option<QuickwitSpan> = serde_json::from_value(v)
-					.map_err(|e| {
-						dbg!(&e);
-						e
-					})
-					.ok();
+				let sp: Option<QuickwitSpan> =
+					serde_json::from_value(v).map_err(|e| anyhow!(e)).ok();
 				sp
 			})
 			.map(Into::into)
