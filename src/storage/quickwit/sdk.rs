@@ -28,15 +28,17 @@ impl QuickwitSdk {
 	{
 		let mut p = self.cfg.qw_endpoint.clone();
 		p.path_segments_mut().unwrap().push("search");
-		self.client
+		let res = self
+			.client
 			.post(p)
 			.json(query)
 			.send()
 			.await?
-			.json()
+			.text()
 			.await
 			.map_err(|e| anyhow!(e))
-			.log_e()
+			.log_e()?;
+		serde_json::from_str(&res).map_err(|e| anyhow!(e)).log_e()
 	}
 	pub async fn level_aggregation(
 		&self,
@@ -282,6 +284,7 @@ pub struct SearchResponseRest {
 	#[serde(default)]
 	pub num_hits: u64,
 	/// List of hits returned.
+	#[serde(default)]
 	pub hits: Vec<JsonValue>,
 	/// List of snippets
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -289,6 +292,7 @@ pub struct SearchResponseRest {
 	/// Elapsed time.
 	pub elapsed_time_micros: u64,
 	/// Search errors.
+	#[serde(default)]
 	pub errors: Vec<String>,
 	/// Aggregations.
 	#[serde(skip_serializing_if = "Option::is_none")]

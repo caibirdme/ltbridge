@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tracing::error;
 
 pub trait ResultLogger {
 	fn log_e(self) -> Self;
@@ -6,12 +7,9 @@ pub trait ResultLogger {
 
 impl<T> ResultLogger for Result<T> {
 	fn log_e(self) -> Self {
-		match self {
-			Ok(v) => Ok(v),
-			Err(e) => {
-				eprintln!("{:?}", e);
-				Err(e)
-			}
-		}
+		self.map_err(|e| {
+			error!("{:?}", e);
+			e
+		})
 	}
 }
