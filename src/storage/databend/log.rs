@@ -194,51 +194,44 @@ fn logql_to_sql(q: &LogQuery, opt: QueryLimits, schema: &LogTable) -> String {
 
 #[derive(Debug, Default, Clone, TryFromRow)]
 struct LogRaw {
-	app: String,
-	server: String,
-	trace_id: String,
-	span_id: String,
-	level: u32,
-	resources: HashMap<String, String>,
-	attributes: HashMap<String, String>,
-	message: String,
-	ts: NaiveDateTime,
+	pub ts: NaiveDateTime,
+	pub trace_id: String,
+	pub span_id: String,
+	pub level: u32,
+	pub service_name: String,
+	pub message: String,
+	pub resource_attributes: HashMap<String, String>,
+	pub scope_name: String,
+	pub scope_attributes: HashMap<String, String>,
+	pub log_attributes: HashMap<String, String>,
 }
 
 fn row_into_logitem(row: Row) -> Result<LogItem> {
-	let LogRaw {
-		app,
-		server,
-		trace_id,
-		span_id,
-		level,
-		resources,
-		attributes,
-		message,
-		ts,
-	} = row.try_into().map_err(|e: String| anyhow::anyhow!(e))?;
+	let row: LogRaw = row.try_into().map_err(|e: String| anyhow::anyhow!(e))?;
 	Ok(LogItem {
-		app,
-		server,
-		trace_id,
-		span_id,
-		level: level.into(),
-		resources,
-		attributes,
-		message,
-		ts,
+		ts: row.ts,
+		trace_id: row.trace_id,
+		span_id: row.span_id,
+		level: row.level.into(),
+		service_name: row.service_name,
+		message: row.message,
+		resource_attributes: row.resource_attributes,
+		scope_name: row.scope_name,
+		scope_attributes: row.scope_attributes,
+		log_attributes: row.log_attributes,
 	})
 }
 
 /*
 	CREATE TABLE logs (
-		app STRING NOT NULL,
-		server STRING NOT NULL,
+		service_name STRING NOT NULL,
 		trace_id STRING,
 		span_id STRING,
 		level TINYINT,
-		resources MAP(STRING, STRING) NOT NULL,
-		attributes MAP(STRING, STRING) NOT NULL,
+		resource_attributes MAP(STRING, STRING) NOT NULL,
+		scope_name STRING,
+		scope_attributes MAP(STRING, STRING),
+		log_attributes MAP(STRING, STRING) NOT NULL,
 		message STRING NOT NULL,
 		ts TIMESTAMP NOT NULL
 	) ENGINE=FUSE CLUSTER BY(TO_YYYYMMDDHH(ts), server);

@@ -116,15 +116,16 @@ impl From<LogLevel> for String {
 
 #[derive(Debug, Clone)]
 pub struct LogItem {
-	pub app: String,
-	pub server: String,
+	pub ts: NaiveDateTime,
 	pub trace_id: String,
 	pub span_id: String,
 	pub level: LogLevel,
-	pub resources: HashMap<String, String>,
-	pub attributes: HashMap<String, String>,
+	pub service_name: String,
 	pub message: String,
-	pub ts: NaiveDateTime,
+	pub resource_attributes: HashMap<String, String>,
+	pub scope_name: String,
+	pub scope_attributes: HashMap<String, String>,
+	pub log_attributes: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]

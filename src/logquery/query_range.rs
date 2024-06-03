@@ -138,16 +138,21 @@ fn to_log_query_range_response(
 		.iter()
 		.map(|r| {
 			let mut tags = HashMap::from_iter(vec![
-				("app".to_string(), r.app.clone()),
-				("server".to_string(), r.server.clone()),
+				("service_name".to_string(), r.service_name.clone()),
 				("trace_id".to_string(), r.trace_id.clone()),
 				("span_id".to_string(), r.span_id.clone()),
 				("level".to_string(), r.level.into()),
 			]);
-			r.resources.iter().for_each(|(k, v)| {
+			if !r.scope_name.is_empty() {
+				tags.insert("scope_name".to_string(), r.scope_name.clone());
+			}
+			r.resource_attributes.iter().for_each(|(k, v)| {
 				tags.insert(format!("resources.{}", k), v.clone());
 			});
-			r.attributes.iter().for_each(|(k, v)| {
+			r.scope_attributes.iter().for_each(|(k, v)| {
+				tags.insert(format!("scopes.{}", k), v.clone());
+			});
+			r.log_attributes.iter().for_each(|(k, v)| {
 				tags.insert(format!("attributes.{}", k), v.clone());
 			});
 			tag_list.push(tags.clone());

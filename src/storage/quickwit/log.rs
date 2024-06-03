@@ -250,17 +250,12 @@ fn record_to_logitem(r: LogRecord) -> LogItem {
 	LogItem {
 		ts: DateTime::from_timestamp_nanos(r.timestamp_nanos as i64)
 			.naive_utc(),
-		app: "default".to_string(),
-		server: r
-			.resource_attributes
-			.get("server")
-			.map(|v| v.to_string())
-			.unwrap_or("unknown".to_string()),
 		trace_id: r.trace_id.unwrap_or("".to_string()),
 		span_id: r.span_id.unwrap_or("".to_string()),
 		level,
-		resources: jsonmap_to_stringmap(r.resource_attributes),
-		attributes: jsonmap_to_stringmap(r.attributes),
+		service_name: r.service_name,
+		resource_attributes: jsonmap_to_stringmap(r.resource_attributes),
+		log_attributes: jsonmap_to_stringmap(r.attributes),
 		message: r
 			.body
 			.map(|v| {
@@ -269,6 +264,8 @@ fn record_to_logitem(r: LogRecord) -> LogItem {
 					.unwrap_or("".to_string())
 			})
 			.unwrap_or_default(),
+		scope_name: r.scope_name.unwrap_or("".to_string()),
+		scope_attributes: jsonmap_to_stringmap(r.scope_attributes),
 	}
 }
 
@@ -284,7 +281,9 @@ fn get_level(r: &LogRecord) -> LogLevel {
 fn jsonmap_to_stringmap(
 	m: HashMap<String, JSONValue>,
 ) -> HashMap<String, String> {
-	m.into_iter().map(|(k, v)| (k, v.to_string())).collect()
+	m.into_iter()
+		.map(|(k, v)| (k, v.to_string().trim_matches('"').to_owned()))
+		.collect()
 }
 
 fn field_alias_k_2_v(f: &str) -> String {
