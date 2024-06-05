@@ -17,6 +17,16 @@ jobs:
         toolchain: 1.78.0
         profile: minimal
         override: true
+    - name: Install binstall
+      uses: actions-rs/cargo@v1
+      with:
+        command: install
+        args: cargo-binstall
+    - name: Install checkers
+      uses: actions-rs/cargo@v1
+      with:
+        command: binstall
+        args: -y cargo-sort
     - name: cargo sort check
       uses: actions-rs/cargo@v1
       with:
