@@ -14,21 +14,22 @@ members = [
 ]
 
 [dependencies]
-logql = {path = "logql"}
-traceql = {path = "traceql"}
 anyhow = "1.0.86"
 async-trait = "0.1.80"
 axum = { version = "0.7.5", features = ["default"] }
 axum-extra = { version = "0.9.3", features = ["protobuf"] }
 axum-valid = "0.18.0"
 chrono = { version = "0.4.38", features = ["serde"] }
+clickhouse = "0.11.6"
 config = { version = "0.14.0" }
-databend-driver = { version = "0.18.3"}
+databend-driver = { version = "0.18.3" }
 dyn-clone = "1.0.17"
 hex = { version = "0.4.3" }
 http = "1.1.0"
 humantime-serde = { version = "1.1.1" }
 itertools = { version = "0.13.0" }
+lazy_static = "1.4.0"
+logql = { path = "logql" }
 moka = { version = "0.12.7", features = ["default", "sync"] }
 opentelemetry = { version = "0.23.0", features = ["metrics"] }
 opentelemetry-prometheus = "0.16.0"
@@ -38,7 +39,7 @@ opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
 ordered-float = { version = "4.2.0" }
 prometheus = "0.13.4"
 prost = { version = "0.12.6" }
-reqwest = { version = "0.12.4", features = ["json"] }
+reqwest = { version = "0.12.4", features = ["json", "native-tls-vendored"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.117" }
 serde_with = { version = "3.8.1", features = ["json"] }
@@ -52,6 +53,7 @@ tower-http = { version = "0.5.2", features = [
     "compression-gzip",
     "decompression-gzip",
 ] }
+traceql = { path = "traceql" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = [
     "default",
@@ -60,11 +62,6 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 url = "2.5.0"
 validator = { version = "0.18.1", features = ["derive"] }
-lazy_static = "1.4.0"
-
-[target.'cfg(target_env = "musl")'.dependencies]
-openssl = { version = "0.10", features = ["vendored"] }
-
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
@@ -74,4 +71,4 @@ sqlparser = "0.47.0"
 
 [build-dependencies]
 anyhow = "1.0.82"
-prost-build = {version = "0.12.6",features = ["default", "cleanup-markdown"]}
+prost-build = { version = "0.12.6", features = ["default", "cleanup-markdown"] }
