@@ -1,10 +1,11 @@
-use super::{super::log::LogLevel, query_plan::*};
+use super::{super::log::LogLevel, converter::DatabendConverter};
 use crate::storage::{log::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use databend_driver::{Connection, Row, TryFromRow};
 use logql::parser::{Filter, LabelPair, LogQuery, MetricQuery};
+use sqlbuilder::builder::*;
 use std::{
 	collections::{HashMap, HashSet},
 	time::Duration,
@@ -63,7 +64,7 @@ impl LogStorage for BendLogQuerier {
 		} else {
 			Some(conditions_into_selection(&conds))
 		};
-		let mut qp = new_from_metricquery(&opt, &self.schema);
+		let mut qp = new_from_metricquery(opt, self.schema.clone());
 		qp.selection = selection;
 		let sql = qp.as_sql();
 		let mut stream = self.cli.query_iter(&sql).await?;
@@ -144,38 +145,37 @@ fn label_values_into_sql(
 	schema: &LogTable,
 	opt: QueryLimits,
 ) -> String {
-	let qp = QueryPlan {
-		schema,
-		projection: if let Some(stripped) = label.strip_prefix(RESOURCES_PREFIX)
-		{
+	let qp: QueryPlan<LogTable, DatabendConverter> = QueryPlan::new(
+		schema.clone(),
+		if let Some(stripped) = label.strip_prefix(RESOURCES_PREFIX) {
 			vec![format!("distinct resources['{}'] as tvals", stripped)]
 		} else if let Some(stripped) = label.strip_prefix(ATTRIBUTES_PREFIX) {
 			vec![format!("distinct attributes['{}'] as tvals", stripped)]
 		} else {
 			vec![format!("distinct {} as tvals", label)]
 		},
-		selection: None,
-		grouping: vec![],
-		sorting: vec![],
-		timing: time_range_into_timing(&opt.range),
-		limit: opt.limit.or(Some(200)),
-	};
+		None,
+		vec![],
+		vec![],
+		time_range_into_timing(&opt.range),
+		opt.limit.or(Some(200)),
+	);
 	qp.as_sql()
 }
 
 fn gen_labels_sql(schema: &LogTable, opt: QueryLimits) -> String {
-	QueryPlan {
-		schema,
-		projection: vec![
+	QueryPlan::<LogTable, DatabendConverter>::new(
+		schema.clone(),
+		vec![
 			"MAP_KEYS(resources) AS res".to_string(),
 			"MAP_KEYS(attributes) AS attrs".to_string(),
 		],
-		selection: None,
-		grouping: vec![],
-		sorting: vec![],
-		timing: time_range_into_timing(&opt.range),
-		limit: opt.limit.or(Some(100)),
-	}
+		None,
+		vec![],
+		vec![],
+		time_range_into_timing(&opt.range),
+		opt.limit.or(Some(100)),
+	)
 	.as_sql()
 }
 
@@ -263,6 +263,9 @@ impl TableSchema for LogTable {
 	fn ts_key(&self) -> &str {
 		self.ts_key
 	}
+	fn msg_key(&self) -> &str {
+		&self.msg_key
+	}
 }
 
 static LABEL_PROJECTIONS: [&str; 5] =
@@ -292,49 +295,49 @@ impl LogTable {
 	}
 }
 
-fn new_from_logquery<'a>(
-	limits: &'a QueryLimits,
-	schema: &'a LogTable,
-) -> QueryPlan<'a, LogTable> {
-	QueryPlan {
-		schema,
-		projection: schema.projection(),
-		selection: None,
-		grouping: vec![],
-		sorting: direction_to_sorting(&limits.direction, schema, false),
-		timing: time_range_into_timing(&limits.range),
-		limit: limits.limit,
-	}
+fn new_from_logquery(
+	limits: &QueryLimits,
+	schema: &LogTable,
+) -> QueryPlan<LogTable, DatabendConverter> {
+	QueryPlan::new(
+		schema.clone(),
+		schema.projection(),
+		None,
+		vec![],
+		direction_to_sorting(&limits.direction, schema, false),
+		time_range_into_timing(&limits.range),
+		limits.limit,
+	)
 }
-fn new_from_metricquery<'a>(
-	limits: &'a QueryLimits,
-	schema: &'a LogTable,
-) -> QueryPlan<'a, LogTable> {
+fn new_from_metricquery(
+	limits: QueryLimits,
+	schema: LogTable,
+) -> QueryPlan<LogTable, DatabendConverter> {
 	let (projection, grouping) = metrics_projection_and_grouping(
-		schema,
+		&schema,
 		limits.step.unwrap_or(DEFAULT_STEP),
 	);
-	QueryPlan {
-		schema,
+	QueryPlan::new(
+		schema.clone(),
 		projection,
-		selection: None,
+		None,
 		grouping,
-		sorting: direction_to_sorting(&limits.direction, schema, true),
-		timing: time_range_into_timing(&limits.range),
-		limit: limits.limit,
-	}
+		direction_to_sorting(&limits.direction, &schema, true),
+		time_range_into_timing(&limits.range),
+		limits.limit,
+	)
 }
 
 fn metrics_projection_and_grouping(
 	schema: &LogTable,
 	step: Duration,
-) -> (Vec<String>, Vec<&'static str>) {
+) -> (Vec<String>, Vec<String>) {
 	let projection = vec![
 		"level".to_string(),
 		format!("{} as nts", truncate_ts(step, schema.ts_key())),
 		"count(*) as total".to_string(),
 	];
-	let grouping = vec!["level", "nts"];
+	let grouping = vec!["level".to_string(), "nts".to_string()];
 	(projection, grouping)
 }
 
@@ -378,11 +381,11 @@ fn label_pair_to_cond(p: &LabelPair) -> Condition {
 	}
 }
 
-fn direction_to_sorting<'a>(
-	d: &'a Option<Direction>,
-	schema: &'a LogTable,
+fn direction_to_sorting(
+	d: &Option<Direction>,
+	schema: &LogTable,
 	revise: bool,
-) -> Vec<(&'a str, SortType)> {
+) -> Vec<(String, SortType)> {
 	let k = if revise {
 		schema.revised_ts_key()
 	} else {
@@ -390,8 +393,8 @@ fn direction_to_sorting<'a>(
 	};
 	if let Some(d) = d {
 		match d {
-			Direction::Forward => vec![(k, SortType::Asc)],
-			Direction::Backward => vec![(k, SortType::Desc)],
+			Direction::Forward => vec![(k.to_string(), SortType::Asc)],
+			Direction::Backward => vec![(k.to_string(), SortType::Desc)],
 		}
 	} else {
 		vec![]
@@ -494,8 +497,9 @@ fn get_round_func(d: Duration) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
+	use super::{super::converter::micro_time, *};
 	use chrono::Local;
+	use common::TimeRange;
 	use pretty_assertions::assert_eq;
 	use sqlparser::{dialect::AnsiDialect, parser::Parser};
 	use std::{fs, path::PathBuf};
@@ -559,15 +563,15 @@ mod tests {
 	#[test]
 	fn into_sql() {
 		let now = Local::now().naive_local();
-		let plan = QueryPlan {
-			schema: &LogTable {
+		let plan: QueryPlan<LogTable, DatabendConverter> = QueryPlan::new(
+			LogTable {
 				use_inverted_index: false,
 				msg_key: "message",
 				ts_key: "ts",
 				table: "logs",
 			},
-			projection: vec!["msg".to_string(), "ts".to_string()],
-			selection: Some(Selection::LogicalAnd(
+			vec!["msg".to_string(), "ts".to_string()],
+			Some(Selection::LogicalAnd(
 				Box::new(Selection::Unit(Condition {
 					column: "app".to_string(),
 					cmp: Cmp::Equal(PlaceValue::String("camp".to_string())),
@@ -577,33 +581,33 @@ mod tests {
 					cmp: Cmp::Contains("error".to_string()),
 				})),
 			)),
-			grouping: vec!["app", "server"],
-			sorting: vec![("ts", SortType::Asc)],
-			timing: vec![(OrdType::LargerEqual, now)],
-			limit: Some(10),
-		};
+			vec!["app".to_string(), "server".to_string()],
+			vec![("ts".to_string(), SortType::Asc)],
+			vec![(OrdType::LargerEqual, now)],
+			Some(10),
+		);
 		assert_eq!(
 			plan.as_sql(),
-			format!("SELECT msg,ts FROM logs WHERE (app = 'camp' AND message LIKE '%error%') AND ts>='{}' GROUP BY app,server ORDER BY ts ASC LIMIT 10",micro_time(&now))
+			format!("SELECT msg,ts FROM logs WHERE (app = 'camp' AND message LIKE '%error%') AND ts>='{}' GROUP BY app,server ORDER BY ts ASC LIMIT 10", micro_time(&now))
 		);
 	}
 	#[test]
 	fn metrics_sql() {
 		let now = Local::now().naive_local();
 		let end = now + Duration::from_secs(3600);
-		let plan = QueryPlan {
-			schema: &LogTable {
+		let plan: QueryPlan<LogTable, DatabendConverter> = QueryPlan::new(
+			LogTable {
 				use_inverted_index: true,
 				msg_key: "message",
 				ts_key: "ts",
 				table: "log",
 			},
-			projection: vec![
+			vec![
 				"level".to_string(),
 				"TO_START_OF_HOUR(ts) as nts".to_string(),
 				"count(*) as total".to_string(),
 			],
-			selection: Some(Selection::LogicalAnd(
+			Some(Selection::LogicalAnd(
 				Box::new(Selection::Unit(Condition {
 					column: "app".to_string(),
 					cmp: Cmp::NotEqual(PlaceValue::String("camp".to_string())),
@@ -613,14 +617,11 @@ mod tests {
 					cmp: Cmp::Match("error".to_string()),
 				})),
 			)),
-			grouping: vec!["level", "nts"],
-			sorting: vec![("nts", SortType::Desc)],
-			timing: vec![
-				(OrdType::LargerEqual, now),
-				(OrdType::SmallerEqual, end),
-			],
-			limit: Some(1000),
-		};
+			vec!["level".to_string(), "nts".to_string()],
+			vec![("nts".to_string(), SortType::Desc)],
+			vec![(OrdType::LargerEqual, now), (OrdType::SmallerEqual, end)],
+			Some(1000),
+		);
 		assert_eq!(
 			plan.as_sql(),
 			format!("SELECT level,TO_START_OF_HOUR(ts) as nts,count(*) as total FROM log WHERE (app != 'camp' AND MATCH(message,'error')) AND ts>='{}' AND ts<='{}' GROUP BY level,nts ORDER BY nts DESC LIMIT 1000",micro_time(&now), micro_time(&end))

@@ -11,7 +11,7 @@ pub mod trace;
 #[derive(Debug, Clone, Default)]
 pub struct QueryLimits {
 	pub limit: Option<u32>,
-	pub range: TimeRange,
+	pub range: common::TimeRange,
 	pub direction: Option<Direction>,
 	pub step: Option<Duration>,
 }
@@ -21,12 +21,6 @@ pub enum Direction {
 	Forward,
 	#[default]
 	Backward,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct TimeRange {
-	pub start: Option<NaiveDateTime>,
-	pub end: Option<NaiveDateTime>,
 }
 
 pub async fn new_trace_source(

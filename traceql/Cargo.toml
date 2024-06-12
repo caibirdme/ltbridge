@@ -6,10 +6,10 @@ rust-version = "1.76.0"
 authors = ["caibirdme <492877816@qq.com>"]
 
 [dependencies]
-nom = { version = "7.1.3" }
-ordered-float = { version = "4.2.0" }
-humantime = { version = "2.1.0" }
+nom = { workspace = true }
+ordered-float = { workspace = true }
+humantime = { workspace = true }
 
 
 [dev-dependencies]
-pretty_assertions = { version = "1.4.0" }
+pretty_assertions = { workspace = true }

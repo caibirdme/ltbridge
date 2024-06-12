@@ -7,7 +7,7 @@ use crate::{
 		SearchResponse, Span as TempoSpan, SpanSet, TraceSearchMetadata,
 	},
 	state::AppState,
-	storage::{trace::SpanItem, QueryLimits, TimeRange},
+	storage::{trace::SpanItem, QueryLimits},
 };
 use axum::{
 	extract::{Query, State},
@@ -15,6 +15,7 @@ use axum::{
 };
 use axum_valid::Valid;
 use chrono::DateTime;
+use common::TimeRange;
 use itertools::Itertools;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
 use serde::{Deserialize, Serialize};

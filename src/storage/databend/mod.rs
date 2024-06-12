@@ -3,8 +3,8 @@ use crate::config::Databend;
 use anyhow::Result;
 use databend_driver::{Client, Connection};
 
+pub(crate) mod converter;
 pub mod log;
-pub(crate) mod query_plan;
 pub mod trace;
 
 pub async fn new_log_source(cfg: Databend) -> Result<Box<dyn LogStorage>> {

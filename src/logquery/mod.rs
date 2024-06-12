@@ -1,12 +1,10 @@
-use crate::{
-	errors::AppError,
-	storage::{QueryLimits, TimeRange as StorageTimeRange},
-};
+use crate::{errors::AppError, storage::QueryLimits};
 use axum::{
 	http::{HeaderMap, StatusCode},
 	response::{IntoResponse, Json, Response},
 };
 use chrono::{DateTime, NaiveDateTime, Utc};
+use common::TimeRange as StorageTimeRange;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 use std::{collections::HashMap, time::Duration};
