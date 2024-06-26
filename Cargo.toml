@@ -41,7 +41,7 @@ prometheus = "0.13.4"
 prost = { version = "0.12.6" }
 reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
-serde_json = { version = "1.0.117" }
+serde_json = { version = "1.0.118" }
 serde_with = { version = "3.8.1", features = ["json"] }
 thiserror = { version = "1.0.61" }
 tokio = { version = "1.38.0", features = ["full"] }
