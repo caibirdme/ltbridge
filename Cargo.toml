@@ -2,7 +2,7 @@
 name = "ltbridge"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76.0"
+rust-version = "1.79.0"
 authors = ["caibirdme <492877816@qq.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -40,7 +40,7 @@ hex = { version = "0.4.3" }
 http = "1.1.0"
 humantime-serde = { version = "1.1.1" }
 itertools = { version = "0.13.0" }
-lazy_static = "1.4.0"
+lazy_static = "1.5.0"
 logql = { path = "logql" }
 moka = { version = "0.12.7", features = ["default", "sync"] }
 opentelemetry = { version = "0.23.0", features = ["metrics"] }
@@ -48,14 +48,13 @@ opentelemetry-prometheus = "0.16.0"
 opentelemetry-proto = { version = "0.6.0", features = ["full"] }
 opentelemetry-semantic-conventions = { version = "0.15.0" }
 opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
-ordered-float = { version = "4.2.0" }
+ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
 prost = { version = "0.12.6" }
-reqwest = { version = "0.12.4", features = ["json", "native-tls-vendored"], default-features = false }
+reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
-serde_json = { version = "1.0.117" }
-serde_with = { version = "3.8.1", features = ["json"] }
-sqlbuilder ={ path = "sqlbuilder" }
+serde_json = { version = "1.0.120" }
+serde_with = { version = "3.8.3", features = ["json"] }
 thiserror = { version = "1.0.61" }
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-stream = { version = "0.1.15" }
@@ -73,7 +72,7 @@ tracing-subscriber = { version = "0.3.18", features = [
     "env-filter",
     "json",
 ] }
-url = "2.5.0"
+url = "2.5.2"
 validator = { version = "0.18.1", features = ["derive"] }
 
 [dev-dependencies]
