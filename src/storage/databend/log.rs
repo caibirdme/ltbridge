@@ -1,19 +1,18 @@
-use super::{super::log::LogLevel, converter::DatabendConverter};
+use super::converter::DatabendLogConverter;
 use crate::storage::{log::*, *};
+use sqlbuilder::{
+	visit::{DefaultIRVisitor,LogQLVisitor},
+	builder::QueryPlan,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use databend_driver::{Connection, Row, TryFromRow};
-use logql::parser::{Filter, LabelPair, LogQuery, MetricQuery};
+use logql::parser::{LogQuery, MetricQuery};
 use sqlbuilder::builder::*;
-use std::{
-	collections::{HashMap, HashSet},
-	time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 use tokio_stream::StreamExt;
 
-const RESOURCES_PREFIX: &str = "resources.";
-const ATTRIBUTES_PREFIX: &str = "attributes.";
 const DEFAULT_STEP: Duration = Duration::from_secs(60);
 
 #[derive(Clone)]
@@ -56,16 +55,9 @@ impl LogStorage for BendLogQuerier {
 		q: &MetricQuery,
 		opt: QueryLimits,
 	) -> Result<Vec<MetricItem>> {
-		let mut conds =
-			label_pairs_into_condition(&q.log_query.selector.label_paris);
-		conds.extend(filter_into_condition(&q.log_query.filters, &self.schema));
-		let selection = if conds.is_empty() {
-			None
-		} else {
-			Some(conditions_into_selection(&conds))
-		};
-		let mut qp = new_from_metricquery(opt, self.schema.clone());
-		qp.selection = selection;
+		let v = LogQLVisitor::new(DefaultIRVisitor{});
+		let selection = v.visit(&q.log_query);
+		let qp = new_from_metricquery(opt, self.schema.clone(), selection);
 		let sql = qp.as_sql();
 		let mut stream = self.cli.query_iter(&sql).await?;
 		let mut metrics = vec![];
@@ -81,114 +73,31 @@ impl LogStorage for BendLogQuerier {
 		}
 		Ok(metrics)
 	}
-	async fn labels(&self, opt: QueryLimits) -> Result<Vec<String>> {
-		let sql = gen_labels_sql(&self.schema, opt);
-		let mut stream = self.cli.query_iter(&sql).await?;
-		let mut resource_labels = HashSet::new();
-		let mut attribute_labels = HashSet::new();
-		while let Some(row) = stream.next().await {
-			let row = row?;
-			// todo: fix this when driver support try_from directly
-			let keys: (Vec<String>, Vec<String>) = TryInto::try_into(row)
-				.map_err(|e: String| anyhow::anyhow!(e))?;
-			resource_labels.extend(keys.0);
-			attribute_labels.extend(keys.1)
-		}
-		let mut labels: Vec<String> = self
-			.schema
-			.label_projection()
-			.iter()
-			.map(|s| s.to_string())
-			.collect();
-		labels.extend(
-			resource_labels
-				.into_iter()
-				.map(|k| RESOURCES_PREFIX.to_owned() + &k),
-		);
-		labels.extend(
-			attribute_labels
-				.into_iter()
-				.map(|k| ATTRIBUTES_PREFIX.to_owned() + &k),
-		);
-		Ok(labels)
+	async fn labels(&self, _: QueryLimits) -> Result<Vec<String>> {
+		Ok(vec![])
 	}
 	async fn label_values(
 		&self,
-		label: &str,
-		opt: QueryLimits,
+		_: &str,
+		_: QueryLimits,
 	) -> Result<Vec<String>> {
-		if label == "level" {
-			return Ok(LogLevel::all_levels());
-		} else if label == "trace_id" || label == "span_id" {
-			// high cardinality, skip for now
-			return Ok(vec![]);
-		}
-		let sql = label_values_into_sql(label, &self.schema, opt);
-		let mut stream = self.cli.query_iter(&sql).await?;
-		let mut values = HashSet::new();
-		while let Some(row) = stream.next().await {
-			let row = row?;
-			let v = TryInto::<(String,)>::try_into(row)
-				.map_err(|e: String| anyhow::anyhow!(e))?;
-			values.insert(v.0);
-		}
-		let values = values
-			.into_iter()
-			.map(|v| v.trim_matches('"').to_string())
-			.collect();
-		Ok(values)
+		Ok(vec![])
 	}
 }
 
-fn label_values_into_sql(
-	label: &str,
-	schema: &LogTable,
-	opt: QueryLimits,
-) -> String {
-	let qp: QueryPlan<LogTable, DatabendConverter> = QueryPlan::new(
+fn logql_to_sql(q: &LogQuery, limits: QueryLimits, schema: &LogTable) -> String {
+	let v = LogQLVisitor::new(DefaultIRVisitor{});
+	let selection = v.visit(q);
+	let qp = QueryPlan::new(
+		DatabendLogConverter::new(schema.clone()),
 		schema.clone(),
-		if let Some(stripped) = label.strip_prefix(RESOURCES_PREFIX) {
-			vec![format!("distinct resources['{}'] as tvals", stripped)]
-		} else if let Some(stripped) = label.strip_prefix(ATTRIBUTES_PREFIX) {
-			vec![format!("distinct attributes['{}'] as tvals", stripped)]
-		} else {
-			vec![format!("distinct {} as tvals", label)]
-		},
-		None,
+		schema.projection(),
+		selection,
 		vec![],
-		vec![],
-		time_range_into_timing(&opt.range),
-		opt.limit.or(Some(200)),
+		direction_to_sorting(&limits.direction, schema, false),
+		time_range_into_timing(&limits.range),
+		limits.limit,
 	);
-	qp.as_sql()
-}
-
-fn gen_labels_sql(schema: &LogTable, opt: QueryLimits) -> String {
-	QueryPlan::<LogTable, DatabendConverter>::new(
-		schema.clone(),
-		vec![
-			"MAP_KEYS(resources) AS res".to_string(),
-			"MAP_KEYS(attributes) AS attrs".to_string(),
-		],
-		None,
-		vec![],
-		vec![],
-		time_range_into_timing(&opt.range),
-		opt.limit.or(Some(100)),
-	)
-	.as_sql()
-}
-
-fn logql_to_sql(q: &LogQuery, opt: QueryLimits, schema: &LogTable) -> String {
-	let mut conds = label_pairs_into_condition(&q.selector.label_paris);
-	conds.extend(filter_into_condition(&q.filters, schema));
-	let selection = if conds.is_empty() {
-		None
-	} else {
-		Some(conditions_into_selection(&conds))
-	};
-	let mut qp = new_from_logquery(&opt, schema);
-	qp.selection = selection;
 	qp.as_sql()
 }
 
@@ -238,11 +147,13 @@ fn row_into_logitem(row: Row) -> Result<LogItem> {
 	CREATE INVERTED INDEX message_idx ON logs(message);
 */
 #[derive(Debug, Clone)]
-struct LogTable {
-	use_inverted_index: bool,
+pub(crate) struct LogTable {
+	pub use_inverted_index: bool,
 	msg_key: &'static str,
 	ts_key: &'static str,
 	table: &'static str,
+	level: &'static str,
+	trace_id: &'static str,
 }
 
 impl Default for LogTable {
@@ -250,8 +161,10 @@ impl Default for LogTable {
 		Self {
 			use_inverted_index: false,
 			msg_key: "message",
-			ts_key: "ts",
+			ts_key: "timestamp",
 			table: "logs",
+			level: "level",
+			trace_id: "trace_id",
 		}
 	}
 }
@@ -266,15 +179,21 @@ impl TableSchema for LogTable {
 	fn msg_key(&self) -> &str {
 		&self.msg_key
 	}
+	fn level_key(&self) -> &str {
+		&self.level
+	}
+	fn trace_key(&self) -> &str {
+		&self.trace_id
+	}
+	fn resources_key(&self) -> &str {
+		"resources"
+	}
+	fn attributes_key(&self) -> &str {
+		"attributes"
+	}
 }
 
-static LABEL_PROJECTIONS: [&str; 5] =
-	["app", "server", "trace_id", "span_id", "level"];
-
 impl LogTable {
-	fn label_projection(&self) -> &[&'static str] {
-		&LABEL_PROJECTIONS
-	}
 	fn projection(&self) -> Vec<String> {
 		vec![
 			"app",
@@ -295,32 +214,20 @@ impl LogTable {
 	}
 }
 
-fn new_from_logquery(
-	limits: &QueryLimits,
-	schema: &LogTable,
-) -> QueryPlan<LogTable, DatabendConverter> {
-	QueryPlan::new(
-		schema.clone(),
-		schema.projection(),
-		None,
-		vec![],
-		direction_to_sorting(&limits.direction, schema, false),
-		time_range_into_timing(&limits.range),
-		limits.limit,
-	)
-}
 fn new_from_metricquery(
 	limits: QueryLimits,
 	schema: LogTable,
-) -> QueryPlan<LogTable, DatabendConverter> {
+	selection: Option<Selection>,
+) -> QueryPlan<LogTable, DatabendLogConverter> {
 	let (projection, grouping) = metrics_projection_and_grouping(
 		&schema,
 		limits.step.unwrap_or(DEFAULT_STEP),
 	);
 	QueryPlan::new(
+		DatabendLogConverter::new(schema.clone()),
 		schema.clone(),
 		projection,
-		None,
+		selection,
 		grouping,
 		direction_to_sorting(&limits.direction, &schema, true),
 		time_range_into_timing(&limits.range),
@@ -341,46 +248,6 @@ fn metrics_projection_and_grouping(
 	(projection, grouping)
 }
 
-fn convert_nested_key(key: &str) -> String {
-	if let Some(stripped) = key.strip_prefix(RESOURCES_PREFIX) {
-		format!("resources['{}']", stripped)
-	} else if let Some(stripped) = key.strip_prefix(ATTRIBUTES_PREFIX) {
-		format!("attributes['{}']", stripped)
-	} else {
-		key.to_string()
-	}
-}
-
-fn label_pairs_into_condition(pairs: &[LabelPair]) -> Vec<Condition> {
-	pairs.iter().map(label_pair_to_cond).collect()
-}
-
-fn label_pair_to_cond(p: &LabelPair) -> Condition {
-	use logql::parser::*;
-	if p.label == "level" {
-		let u: u32 = LogLevel::try_from(p.value.to_string())
-			.unwrap_or(LogLevel::Info)
-			.into();
-		return Condition {
-			column: "level".to_string(),
-			cmp: Cmp::Equal(PlaceValue::Integer(u as i64)),
-		};
-	}
-	Condition {
-		column: convert_nested_key(&p.label),
-		cmp: match p.op {
-			Operator::Equal => {
-				Cmp::Equal(PlaceValue::String(p.value.to_string()))
-			}
-			Operator::NotEqual => {
-				Cmp::NotEqual(PlaceValue::String(p.value.to_string()))
-			}
-			Operator::RegexMatch => Cmp::RegexMatch(p.value.to_string()),
-			Operator::RegexNotMatch => Cmp::RegexNotMatch(p.value.to_string()),
-		},
-	}
-}
-
 fn direction_to_sorting(
 	d: &Option<Direction>,
 	schema: &LogTable,
@@ -396,52 +263,6 @@ fn direction_to_sorting(
 			Direction::Forward => vec![(k.to_string(), SortType::Asc)],
 			Direction::Backward => vec![(k.to_string(), SortType::Desc)],
 		}
-	} else {
-		vec![]
-	}
-}
-
-fn filter_into_condition(
-	filters: &Option<Vec<Filter>>,
-	schema: &LogTable,
-) -> Vec<Condition> {
-	use logql::parser::*;
-	if let Some(filters) = filters {
-		filters
-			.iter()
-			.filter_map(|f| match f {
-				Filter::LogLine(l) => Some(l),
-				_ => None,
-			})
-			.map(|l| {
-				let cmp = match l.op {
-					FilterType::Contain => {
-						if schema.use_inverted_index {
-							Cmp::Match(l.expression.to_string())
-						} else {
-							Cmp::Contains(l.expression.to_string())
-						}
-					}
-					FilterType::NotContain => {
-						if schema.use_inverted_index {
-							Cmp::NotMatch(l.expression.to_string())
-						} else {
-							Cmp::NotContains(l.expression.to_string())
-						}
-					}
-					FilterType::RegexMatch => {
-						Cmp::RegexMatch(l.expression.to_string())
-					}
-					FilterType::RegexNotMatch => {
-						Cmp::RegexNotMatch(l.expression.to_string())
-					}
-				};
-				Condition {
-					column: schema.msg_key.to_string(),
-					cmp,
-				}
-			})
-			.collect()
 	} else {
 		vec![]
 	}
@@ -499,7 +320,6 @@ fn get_round_func(d: Duration) -> &'static str {
 mod tests {
 	use super::{super::converter::micro_time, *};
 	use chrono::Local;
-	use common::TimeRange;
 	use pretty_assertions::assert_eq;
 	use sqlparser::{dialect::AnsiDialect, parser::Parser};
 	use std::{fs, path::PathBuf};
@@ -563,21 +383,25 @@ mod tests {
 	#[test]
 	fn into_sql() {
 		let now = Local::now().naive_local();
-		let plan: QueryPlan<LogTable, DatabendConverter> = QueryPlan::new(
-			LogTable {
-				use_inverted_index: false,
-				msg_key: "message",
-				ts_key: "ts",
-				table: "logs",
-			},
+		let tb = LogTable {
+			use_inverted_index: false,
+			msg_key: "message",
+			ts_key: "ts",
+			table: "logs",
+			level: "level",
+			trace_id:"trace_id",
+		};
+		let plan: QueryPlan<LogTable, DatabendLogConverter> = QueryPlan::new(
+			DatabendLogConverter::new(tb.clone()),
+			tb,
 			vec!["msg".to_string(), "ts".to_string()],
 			Some(Selection::LogicalAnd(
 				Box::new(Selection::Unit(Condition {
-					column: "app".to_string(),
+					column: Column::Raw("app".to_string()),
 					cmp: Cmp::Equal(PlaceValue::String("camp".to_string())),
 				})),
 				Box::new(Selection::Unit(Condition {
-					column: "message".to_string(),
+					column: Column::Message,
 					cmp: Cmp::Contains("error".to_string()),
 				})),
 			)),
@@ -595,13 +419,17 @@ mod tests {
 	fn metrics_sql() {
 		let now = Local::now().naive_local();
 		let end = now + Duration::from_secs(3600);
-		let plan: QueryPlan<LogTable, DatabendConverter> = QueryPlan::new(
-			LogTable {
-				use_inverted_index: true,
-				msg_key: "message",
-				ts_key: "ts",
-				table: "log",
-			},
+		let tb = LogTable {
+			use_inverted_index: true,
+			msg_key: "message",
+			ts_key: "ts",
+			table: "log",
+			level: "level",
+			trace_id:"trace_id",
+		};
+		let plan: QueryPlan<LogTable, DatabendLogConverter> = QueryPlan::new(
+			DatabendLogConverter::new(tb.clone()),
+			tb,
 			vec![
 				"level".to_string(),
 				"TO_START_OF_HOUR(ts) as nts".to_string(),
@@ -609,12 +437,12 @@ mod tests {
 			],
 			Some(Selection::LogicalAnd(
 				Box::new(Selection::Unit(Condition {
-					column: "app".to_string(),
+					column: Column::Raw("app".to_string()),
 					cmp: Cmp::NotEqual(PlaceValue::String("camp".to_string())),
 				})),
 				Box::new(Selection::Unit(Condition {
-					column: "message".to_string(),
-					cmp: Cmp::Match("error".to_string()),
+					column: Column::Message,
+					cmp: Cmp::Contains("error".to_string()),
 				})),
 			)),
 			vec!["level".to_string(), "nts".to_string()],
@@ -663,56 +491,6 @@ mod tests {
 			} else {
 				panic!("case: {}, expect LogQuery, got {:?}", case, q);
 			}
-		}
-	}
-
-	#[test]
-	fn test_label_sql() {
-		let now = Local::now().naive_local();
-		let test_cases = [
-			(
-				QueryLimits {
-					range: TimeRange::default(),
-					limit: Some(50),
-					step: None,
-					direction: None,
-				},
-				"SELECT MAP_KEYS(resources) AS res, MAP_KEYS(attributes) AS attrs FROM logs LIMIT 50".to_string(),
-			),
-			(
-				QueryLimits {
-					range: TimeRange::default(),
-					limit: None,
-					step: None,
-					direction: None,
-				},
-				"SELECT MAP_KEYS(resources) AS res, MAP_KEYS(attributes) AS attrs FROM logs LIMIT 100".to_string(),
-			),
-			(
-				QueryLimits {
-					range: TimeRange {
-						start: Some(now - Duration::from_secs(60)),
-						end: Some(now),
-					},
-					limit: None,
-					step: None,
-					direction: None,
-				},
-				format!(
-					"SELECT MAP_KEYS(resources) AS res, MAP_KEYS(attributes) AS attrs FROM logs WHERE ts>='{}' AND ts<='{}' LIMIT 100",
-					micro_time(&(now - Duration::from_secs(60))),
-					micro_time(&now)
-				),
-			),
-		];
-		for (opt, expect) in test_cases.iter() {
-			let schema = LogTable::default();
-			let actual = gen_labels_sql(&schema, opt.clone());
-			let actual_ast =
-				Parser::parse_sql(&AnsiDialect {}, &actual).unwrap();
-			let expect_ast =
-				Parser::parse_sql(&AnsiDialect {}, expect).unwrap();
-			assert_eq!(expect_ast[0].to_string(), actual_ast[0].to_string());
 		}
 	}
 }

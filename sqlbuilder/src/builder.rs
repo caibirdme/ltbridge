@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
 use common::TimeRange;
-use std::{fmt::Display, marker::PhantomData};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cmp {
@@ -10,8 +10,6 @@ pub enum Cmp {
 	RegexNotMatch(String),
 	Contains(String),
 	NotContains(String),
-	Match(String),
-	NotMatch(String),
 	Larger(PlaceValue),
 	LargerEqual(PlaceValue),
 	Less(PlaceValue),
@@ -44,8 +42,19 @@ pub enum Selection {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Condition {
-	pub column: String,
+	pub column: Column,
 	pub cmp: Cmp,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Column {
+	Message,
+	Timestamp,
+	Level,
+	TraceID,
+	Resources(String),
+	Attributes(String),
+	Raw(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,11 +73,15 @@ pub trait TableSchema {
 	fn table(&self) -> &str;
 	fn ts_key(&self) -> &str;
 	fn msg_key(&self) -> &str;
+	fn level_key(&self) -> &str;
+	fn trace_key(&self) -> &str;
+	fn resources_key(&self) -> &str;
+	fn attributes_key(&self) -> &str;
 }
 
 #[derive(Debug, Clone)]
 pub struct QueryPlan<T: TableSchema, C: QueryConverter> {
-	_converter: PhantomData<C>,
+	converter: C,
 	pub schema: T,
 	pub projection: Vec<String>,
 	pub selection: Option<Selection>,
@@ -80,6 +93,7 @@ pub struct QueryPlan<T: TableSchema, C: QueryConverter> {
 
 impl<T: TableSchema, C: QueryConverter> QueryPlan<T, C> {
 	pub fn new(
+		converter: C,
 		schema: T,
 		projection: Vec<String>,
 		selection: Option<Selection>,
@@ -89,7 +103,7 @@ impl<T: TableSchema, C: QueryConverter> QueryPlan<T, C> {
 		limit: Option<u32>,
 	) -> Self {
 		Self {
-			_converter: PhantomData,
+			converter,
 			schema,
 			projection,
 			selection,
@@ -141,24 +155,24 @@ where
 	fn projection_part(&self) -> String {
 		format!("SELECT {}", self.projection.join(","))
 	}
-	fn selection_to_sql(s: &Selection) -> String {
+	fn selection_to_sql(&self, s: &Selection) -> String {
 		match s {
-			Selection::Unit(ref c) => C::convert_condition(c),
+			Selection::Unit(ref c) => self.converter.convert_condition(c),
 			Selection::LogicalAnd(ref l, ref r) => {
-				let l = Self::selection_to_sql(l);
-				let r = Self::selection_to_sql(r);
+				let l = self.selection_to_sql(l);
+				let r = self.selection_to_sql(r);
 				format!("({} AND {})", l, r)
 			}
 			Selection::LogicalOr(ref l, ref r) => {
-				let l = Self::selection_to_sql(l);
-				let r = Self::selection_to_sql(r);
+				let l = self.selection_to_sql(l);
+				let r = self.selection_to_sql(r);
 				format!("({} OR {})", l, r)
 			}
 		}
 	}
 	fn selection_part(&self) -> String {
 		if let Some(s) = &self.selection {
-			Self::selection_to_sql(s)
+			self.selection_to_sql(s)
 		} else {
 			"".to_string()
 		}
@@ -185,7 +199,7 @@ where
 		let ts_key = self.schema.ts_key();
 		self.timing
 			.iter()
-			.map(|(o, t)| C::convert_timing(ts_key, o, t))
+			.map(|(o, t)| self.converter.convert_timing(ts_key, o, t))
 			.collect()
 	}
 	fn limit_part(&self) -> Option<String> {
@@ -216,8 +230,8 @@ pub fn conditions_into_selection(conds: &[Condition]) -> Selection {
 }
 
 pub trait QueryConverter {
-	fn convert_condition(c: &Condition) -> String;
-	fn convert_timing(ts_key: &str, o: &OrdType, t: &NaiveDateTime) -> String;
+	fn convert_condition(&self, c: &Condition) -> String;
+	fn convert_timing(&self, ts_key: &str, o: &OrdType, t: &NaiveDateTime) -> String;
 }
 
 #[cfg(test)]

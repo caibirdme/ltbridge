@@ -1,7 +1,7 @@
-use super::converter::DatabendConverter;
 use crate::storage::{trace::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
+use databend::converter::DatabendTraceConverter;
 use databend_driver::{Connection, Row, TryFromRow};
 use itertools::Itertools;
 use sqlbuilder::builder::*;
@@ -33,7 +33,7 @@ impl TraceStorage for BendTraceQuerier {
 	) -> Result<Vec<SpanItem>> {
 		let mut qp = new_qp(&opt, self.schema.clone());
 		let conds = vec![Condition {
-			column: self.schema.trace_key().to_string(),
+			column: Column::TraceID,
 			cmp: Cmp::Equal(PlaceValue::String(trace_id.to_string())),
 		}];
 		let selection = Some(conditions_into_selection(conds.as_slice()));
@@ -104,7 +104,7 @@ CREATE TABLE spans (
 ) ENGINE = FUSE CLUSTER BY (TO_YYYYMMDDHH(ts));
 */
 #[derive(Debug, Clone)]
-struct TraceTable {
+pub struct TraceTable {
 	t: String,
 }
 
@@ -156,15 +156,28 @@ impl TableSchema for TraceTable {
 	fn msg_key(&self) -> &str {
 		""
 	}
+	fn level_key(&self) -> &str {
+		""
+	}
+	fn trace_key(&self) -> &str {
+		self.trace_key()
+	}
+	fn resources_key(&self) -> &str {
+		"resource_attributes"
+	}
+	fn attributes_key(&self) -> &str {
+		"span_attributes"
+	}
 }
 
 fn new_qp(
 	opt: &QueryLimits,
 	schema: TraceTable,
-) -> QueryPlan<TraceTable, DatabendConverter> {
+) -> QueryPlan<TraceTable, DatabendTraceConverter> {
 	let t = unsafe { std::mem::transmute(opt.range.clone()) };
 	let projection = schema.projection();
 	QueryPlan::new(
+		DatabendTraceConverter::new(schema.clone()),
 		schema,
 		projection,
 		None,
@@ -218,7 +231,7 @@ WHERE sp.span_id IN (
 
 struct ComplexQuery {
 	schema: TraceTable,
-	span_selections: Vec<QueryPlan<TraceTable, DatabendConverter>>,
+	span_selections: Vec<QueryPlan<TraceTable, DatabendTraceConverter>>,
 	trace_selections: SubQuery,
 	limits: QueryLimits,
 }
@@ -252,7 +265,7 @@ impl ComplexQuery {
 }
 
 enum SubQuery {
-	Basic(QueryPlan<TraceTable, DatabendConverter>),
+	Basic(QueryPlan<TraceTable, DatabendTraceConverter>),
 	And(Box<SubQuery>, Box<SubQuery>),
 	Or(Box<SubQuery>, Box<SubQuery>),
 }
@@ -287,7 +300,7 @@ fn field_value_to_place_value(f: &FieldValue) -> PlaceValue {
 }
 
 fn construct_condition(
-	key: String,
+	key: Column,
 	value: PlaceValue,
 	op: ComparisonOperator,
 ) -> Condition {
@@ -337,27 +350,27 @@ fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 	match &expr.kv {
 		FieldType::Intrinsic(intrisinc) => match intrisinc {
 			IntrisincField::Status(status) => construct_condition(
-				"status_code".to_string(),
+				Column::Raw("status_code".to_string()),
 				PlaceValue::Integer((*status).into()),
 				expr.operator,
 			),
 			IntrisincField::Duraion(d) => construct_condition(
-				"duration".to_string(),
+				Column::Raw("duration".to_string()),
 				PlaceValue::Integer(d.as_nanos() as i64),
 				expr.operator,
 			),
 			IntrisincField::Kind(kind) => construct_condition(
-				"span_kind".to_string(),
+				Column::Raw("span_kind".to_string()),
 				PlaceValue::Integer((*kind).into()),
 				expr.operator,
 			),
 			IntrisincField::Name(name) => construct_condition(
-				"span_name".to_string(),
+				Column::Raw("span_name".to_string()),
 				PlaceValue::String(name.clone()),
 				expr.operator,
 			),
 			IntrisincField::ServiceName(name) => construct_condition(
-				"service_name".to_string(),
+				Column::Raw("service_name".to_string()),
 				PlaceValue::String(name.clone()),
 				expr.operator,
 			),
@@ -366,7 +379,7 @@ fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 		FieldType::Resource(key, val) => {
 			let value = field_value_to_place_value(val);
 			construct_condition(
-				format!("resource_attributes['{}']", key),
+				Column::Resources(key.clone()),
 				value,
 				expr.operator,
 			)
@@ -374,7 +387,7 @@ fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 		FieldType::Span(key, val) => {
 			let value = field_value_to_place_value(val);
 			construct_condition(
-				format!("span_attributes['{}']", key),
+				Column::Attributes(key.clone()),
 				value,
 				expr.operator,
 			)
@@ -423,7 +436,7 @@ fn new_from_expression(
 	expr: &Expression,
 	opt: &QueryLimits,
 	schema: &TraceTable,
-	spans: &mut Vec<QueryPlan<TraceTable, DatabendConverter>>,
+	spans: &mut Vec<QueryPlan<TraceTable, DatabendTraceConverter>>,
 ) -> SubQuery {
 	match expr {
 		Expression::SpanSet(spanset) => {

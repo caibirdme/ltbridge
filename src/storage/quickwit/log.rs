@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-
+use common::LogLevel;
 use super::{
 	qwdsl::{self, Clause, Query, TermCtx, Unary},
 	sdk::{self, *},
