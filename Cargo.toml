@@ -30,7 +30,7 @@ humantime-serde = { version = "1.1.1" }
 itertools = { version = "0.13.0" }
 lazy_static = "1.5.0"
 logql = { path = "logql" }
-moka = { version = "0.12.7", features = ["default", "sync"] }
+moka = { version = "0.12.8", features = ["default", "sync"] }
 opentelemetry = { version = "0.23.0", features = ["metrics"] }
 opentelemetry-prometheus = "0.16.0"
 opentelemetry-proto = { version = "0.6.0", features = ["full"] }
