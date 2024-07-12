@@ -43,7 +43,7 @@ reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored"], defa
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 serde_with = { version = "3.8.3", features = ["json"] }
-thiserror = { version = "1.0.61" }
+thiserror = { version = "1.0.62" }
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-stream = { version = "0.1.15" }
 tower = { version = "0.4.13" }
