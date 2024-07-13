@@ -26,7 +26,7 @@ pretty_assertions = "1.4.0"
 
 [dependencies]
 anyhow = "1.0.86"
-async-trait = "0.1.80"
+async-trait = "0.1.81"
 axum = { version = "0.7.5", features = ["default"] }
 axum-extra = { version = "0.9.3", features = ["protobuf"] }
 axum-valid = "0.18.0"
@@ -42,7 +42,7 @@ humantime-serde = { version = "1.1.1" }
 itertools = { version = "0.13.0" }
 lazy_static = "1.5.0"
 logql = { path = "logql" }
-moka = { version = "0.12.7", features = ["default", "sync"] }
+moka = { version = "0.12.8", features = ["default", "sync"] }
 opentelemetry = { version = "0.23.0", features = ["metrics"] }
 opentelemetry-prometheus = "0.16.0"
 opentelemetry-proto = { version = "0.6.0", features = ["full"] }
@@ -52,11 +52,11 @@ ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
 prost = { version = "0.12.6" }
 reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored"], default-features = false }
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 serde_with = { version = "3.8.3", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
-thiserror = { version = "1.0.61" }
+thiserror = { version = "1.0.62" }
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-stream = { version = "0.1.15" }
 tower = { version = "0.4.13" }
@@ -80,8 +80,8 @@ validator = { version = "0.18.1", features = ["derive"] }
 pretty_assertions = {workspace = true}
 serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
-sqlparser = "0.47.0"
+sqlparser = "0.48.0"
 
 [build-dependencies]
 anyhow = "1.0.82"
-prost-build = { version = "0.12.6", features = ["default", "cleanup-markdown"] }
+prost-build = { version = "0.13.1", features = ["default", "cleanup-markdown"] }
