@@ -29,7 +29,7 @@ anyhow = "1.0.86"
 async-trait = "0.1.81"
 axum = { version = "0.7.5", features = ["default"] }
 axum-extra = { version = "0.9.3", features = ["protobuf"] }
-axum-valid = "0.18.0"
+axum-valid = "0.19.0"
 chrono = { workspace = true }
 common = { path = "common" }
 clickhouse = "0.11.6"
