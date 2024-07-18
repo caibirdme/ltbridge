@@ -34,7 +34,7 @@ moka = { version = "0.12.8", features = ["default", "sync"] }
 opentelemetry = { version = "0.23.0", features = ["metrics"] }
 opentelemetry-prometheus = "0.16.0"
 opentelemetry-proto = { version = "0.6.0", features = ["full"] }
-opentelemetry-semantic-conventions = { version = "0.15.0" }
+opentelemetry-semantic-conventions = { version = "0.16.0" }
 opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
 ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
