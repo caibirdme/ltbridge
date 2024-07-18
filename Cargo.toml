@@ -18,7 +18,7 @@ anyhow = "1.0.86"
 async-trait = "0.1.81"
 axum = { version = "0.7.5", features = ["default"] }
 axum-extra = { version = "0.9.3", features = ["protobuf"] }
-axum-valid = "0.18.0"
+axum-valid = "0.19.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 clickhouse = "0.11.6"
 config = { version = "0.14.0" }
