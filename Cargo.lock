@@ -1672,7 +1672,7 @@ dependencies = [
  "ordered-float",
  "pretty_assertions",
  "prometheus",
- "prost 0.12.6",
+ "prost 0.13.1",
  "prost-build",
  "reqwest",
  "serde",
