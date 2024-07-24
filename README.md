@@ -22,8 +22,9 @@ This project, named **ltbridge**, implements the HTTP interfaces of Grafana Loki
 
 ## Current Progress
 
-### This project is under active development, don't use it in production for now
+### This project is under active development, don't use it in production for now(we're using it in prod)
 
+- **Clickhouse Storage:** Implemented and functional, but requires polishing.
 - **Databend Storage:** Implemented and functional, but requires polishing.
 - **Quickwit Storage:** Implemented and functional, but requires polishing.
 
@@ -222,6 +223,42 @@ trace_source:
 ```
 
 **Note:** You must run ltbridge locally and listen on port 6778(predefined for the grafana datasource) so that the processes in Docker can access it via `http://host.docker.internal:6778`.
+
+### Clickhouse
+
+#### Table
+
+See: [opentelemetry-collector clickhouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter)
+
+#### Start ltbridge
+
+```yaml
+server:
+  listen_addr: 0.0.0.0:6778
+  timeout: 30s
+  log:
+    level: info
+    file: info.log
+    # for more details about filter_directives
+    # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+    filter_directives: info,tower_http=off,databend_client=off
+log_source:
+  clickhouse:
+    url: http://127.0.0.1:8123
+    database: default
+    table: otel_logs
+    username: default
+    password: a11221122a
+trace_source:
+  clickhouse:
+    url: http://127.0.0.1:8123
+    database: default
+    table: otel_traces
+    username: default
+    password: a11221122a
+```
+
+**Note:** Since there's no available rust clickhouse sdk that supports nested type and map at the same time, ltbridge has no choice but to use http + jsoneachrow, so 8123 is required.
 
 ### Try search in grafana
 
