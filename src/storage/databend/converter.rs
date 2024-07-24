@@ -1,15 +1,11 @@
+use super::{log::LogTable, trace::TraceTable};
 use chrono::NaiveDateTime;
 use sqlbuilder::builder::*;
-use super::{
-	log::LogTable,
-	trace::TraceTable,
-};
 
 #[derive(Clone)]
 pub struct DatabendLogConverter {
 	table: LogTable,
 }
-
 
 impl DatabendLogConverter {
 	pub fn new(table: LogTable) -> Self {
@@ -31,7 +27,7 @@ fn column_name(obj: &impl TableSchema, c: &Column) -> String {
 
 impl QueryConverter for DatabendLogConverter {
 	fn convert_condition(&self, c: &Condition) -> String {
-		let col_name = column_name(&self.table,&c.column);
+		let col_name = column_name(&self.table, &c.column);
 		match &c.cmp {
 			Cmp::Equal(v) => format!("{} = {}", col_name, v),
 			Cmp::NotEqual(v) => format!("{} != {}", col_name, v),
@@ -47,18 +43,23 @@ impl QueryConverter for DatabendLogConverter {
 				} else {
 					format!("{} LIKE '%{}%'", col_name, v)
 				}
-			},
+			}
 			Cmp::NotContains(v) => {
 				if self.table.use_inverted_index {
 					format!("NOT MATCH({},'{}')", col_name, v)
 				} else {
 					format!("{} NOT LIKE '%{}%'", col_name, v)
 				}
-			},
+			}
 		}
 	}
 
-	fn convert_timing(&self, ts_key: &str, o: &OrdType, t: &NaiveDateTime) -> String {
+	fn convert_timing(
+		&self,
+		ts_key: &str,
+		o: &OrdType,
+		t: &NaiveDateTime,
+	) -> String {
 		convert_timing(ts_key, o, t)
 	}
 }
@@ -79,12 +80,10 @@ pub fn micro_time(t: &NaiveDateTime) -> String {
 	t.format("%Y-%m-%d %H:%M:%S%.6f").to_string()
 }
 
-
 #[derive(Clone)]
 pub struct DatabendTraceConverter {
 	table: TraceTable,
 }
-
 
 impl DatabendTraceConverter {
 	pub fn new(table: TraceTable) -> Self {
@@ -94,7 +93,7 @@ impl DatabendTraceConverter {
 
 impl QueryConverter for DatabendTraceConverter {
 	fn convert_condition(&self, c: &Condition) -> String {
-		let col_name = column_name(&self.table,&c.column);
+		let col_name = column_name(&self.table, &c.column);
 		match &c.cmp {
 			Cmp::Equal(v) => format!("{} = {}", col_name, v),
 			Cmp::NotEqual(v) => format!("{} != {}", col_name, v),
@@ -109,7 +108,12 @@ impl QueryConverter for DatabendTraceConverter {
 		}
 	}
 
-	fn convert_timing(&self, ts_key: &str, o: &OrdType, t: &NaiveDateTime) -> String {
+	fn convert_timing(
+		&self,
+		ts_key: &str,
+		o: &OrdType,
+		t: &NaiveDateTime,
+	) -> String {
 		convert_timing(ts_key, o, t)
 	}
 }

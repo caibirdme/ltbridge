@@ -92,6 +92,7 @@ pub struct QueryPlan<T: TableSchema, C: QueryConverter> {
 }
 
 impl<T: TableSchema, C: QueryConverter> QueryPlan<T, C> {
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		converter: C,
 		schema: T,
@@ -231,7 +232,12 @@ pub fn conditions_into_selection(conds: &[Condition]) -> Selection {
 
 pub trait QueryConverter {
 	fn convert_condition(&self, c: &Condition) -> String;
-	fn convert_timing(&self, ts_key: &str, o: &OrdType, t: &NaiveDateTime) -> String;
+	fn convert_timing(
+		&self,
+		ts_key: &str,
+		o: &OrdType,
+		t: &NaiveDateTime,
+	) -> String;
 }
 
 #[cfg(test)]

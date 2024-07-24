@@ -1,32 +1,33 @@
-use std::collections::HashMap;
-use chrono::{DateTime, NaiveDateTime};
-use reqwest::Client;
-use logql::parser::{LogQuery, MetricQuery};
-use crate::storage::{log::*, *};
+use super::{common::*, converter::CKLogConverter};
 use crate::config::Clickhouse;
+use crate::storage::{log::*, *};
 use async_trait::async_trait;
-use sqlbuilder::{
-	builder::{QueryPlan, TableSchema, time_range_into_timing},
-	visit::{DefaultIRVisitor,LogQLVisitor},
-};
-use serde_json::Value as JSONValue;
-use super::{
-	converter::CKLogConverter,
-	common::*,
-};
+use chrono::{DateTime, NaiveDateTime};
 use common::LogLevel;
+use logql::parser::{LogQuery, MetricQuery};
+use reqwest::Client;
+use serde_json::Value as JSONValue;
+use sqlbuilder::{
+	builder::{time_range_into_timing, QueryPlan, TableSchema},
+	visit::{DefaultIRVisitor, LogQLVisitor},
+};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct CKLogQuerier {
-    cli: Client,
+	cli: Client,
 	schema: LogTable,
 	ck_cfg: Clickhouse,
 }
 
 impl CKLogQuerier {
-    pub fn new(cli: Client, table: String, ck_cfg: Clickhouse) -> Self {
-        Self { cli, schema: LogTable::new(table), ck_cfg}
-    }
+	pub fn new(cli: Client, table: String, ck_cfg: Clickhouse) -> Self {
+		Self {
+			cli,
+			schema: LogTable::new(table),
+			ck_cfg,
+		}
+	}
 }
 
 #[async_trait]
@@ -37,27 +38,29 @@ impl LogStorage for CKLogQuerier {
 		opt: QueryLimits,
 	) -> Result<Vec<LogItem>> {
 		let sql = logql_to_sql(q, opt, &self.schema);
-		let mut results = vec![]; 
-		let rows = send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
+		let mut results = vec![];
+		let rows =
+			send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
 		for row in rows {
 			let record = LogRecod::try_from(row)?;
 			results.push(record.into());
 		}
 		Ok(results)
 	}
-    async fn query_metrics(
+	async fn query_metrics(
 		&self,
 		q: &MetricQuery,
 		opt: QueryLimits,
 	) -> Result<Vec<MetricItem>> {
 		let sql = new_from_metricquery(q, opt, self.schema.clone());
 		let mut results = vec![];
-		let rows = send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
+		let rows =
+			send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
 		for row in rows {
 			let record = MetricRecord::try_from(row)?;
 			results.push(record.into());
 		}
-        Ok(results)
+		Ok(results)
 	}
 }
 
@@ -70,18 +73,24 @@ struct MetricRecord {
 
 impl TryFrom<Vec<JSONValue>> for MetricRecord {
 	type Error = CKConvertErr;
-	fn try_from(value: Vec<JSONValue>) -> std::result::Result<Self, Self::Error> {
+	fn try_from(
+		value: Vec<JSONValue>,
+	) -> std::result::Result<Self, Self::Error> {
 		if value.len() != 3 {
-			return Err(CKConvertErr::InvalidLength);
+			return Err(CKConvertErr::Length);
 		}
-		let ts = value[0].as_str().ok_or(CKConvertErr::InvalidTimestamp)?;
-		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S").map_err(|e| {
-			dbg!(e);
-			CKConvertErr::InvalidTimestamp
-		})?;
+		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
+		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S")
+			.map_err(|e| {
+				dbg!(e);
+				CKConvertErr::Timestamp
+			})?;
 
 		let record = Self {
-			ts: tts.and_utc().timestamp_nanos_opt().ok_or(CKConvertErr::InvalidTimestamp)?,
+			ts: tts
+				.and_utc()
+				.timestamp_nanos_opt()
+				.ok_or(CKConvertErr::Timestamp)?,
 			severity_text: value[1].as_str().unwrap_or("").to_string(),
 			total: value[2].as_str().unwrap_or("0").parse().unwrap_or(0),
 		};
@@ -92,7 +101,8 @@ impl TryFrom<Vec<JSONValue>> for MetricRecord {
 impl From<MetricRecord> for MetricItem {
 	fn from(r: MetricRecord) -> Self {
 		Self {
-			level: LogLevel::try_from(r.severity_text).unwrap_or(LogLevel::Trace),
+			level: LogLevel::try_from(r.severity_text)
+				.unwrap_or(LogLevel::Trace),
 			total: r.total,
 			ts: DateTime::from_timestamp_nanos(r.ts).naive_utc(),
 		}
@@ -104,7 +114,7 @@ fn new_from_metricquery(
 	limits: QueryLimits,
 	schema: LogTable,
 ) -> String {
-	let v = LogQLVisitor::new(DefaultIRVisitor{});
+	let v = LogQLVisitor::new(DefaultIRVisitor {});
 	let selection = v.visit(&q.log_query);
 	let step = limits.step.unwrap_or(DEFAULT_STEP);
 	let qp = QueryPlan::new(
@@ -124,8 +134,12 @@ fn new_from_metricquery(
 	qp.as_sql()
 }
 
-fn logql_to_sql(q: &LogQuery, limits: QueryLimits, schema: &LogTable) -> String {
-	let v = LogQLVisitor::new(DefaultIRVisitor{});
+fn logql_to_sql(
+	q: &LogQuery,
+	limits: QueryLimits,
+	schema: &LogTable,
+) -> String {
+	let v = LogQLVisitor::new(DefaultIRVisitor {});
 	let selection = v.visit(q);
 	let qp = QueryPlan::new(
 		CKLogConverter::new(schema.clone()),
@@ -139,7 +153,6 @@ fn logql_to_sql(q: &LogQuery, limits: QueryLimits, schema: &LogTable) -> String 
 	);
 	qp.as_sql()
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct LogTable {
@@ -168,9 +181,6 @@ static LOG_TABLE_COLS: [&str; 11] = [
 	"ScopeAttributes",
 	"LogAttributes",
 ];
-
-
-
 
 /*
 	`Timestamp` DateTime64(9) CODEC(Delta(8), ZSTD(1)),
@@ -202,15 +212,21 @@ struct LogRecod {
 
 impl TryFrom<Vec<JSONValue>> for LogRecod {
 	type Error = CKConvertErr;
-	fn try_from(value: Vec<JSONValue>) -> std::result::Result<Self, Self::Error> {
+	fn try_from(
+		value: Vec<JSONValue>,
+	) -> std::result::Result<Self, Self::Error> {
 		if value.len() != 11 {
-			return Err(CKConvertErr::InvalidLength);
+			return Err(CKConvertErr::Length);
 		}
-		let ts = value[0].as_str().ok_or(CKConvertErr::InvalidTimestamp)?;
-		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f").map_err(|_| CKConvertErr::InvalidTimestamp)?;
+		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
+		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f")
+			.map_err(|_| CKConvertErr::Timestamp)?;
 
 		let record = Self {
-			timestamp: tts.and_utc().timestamp_nanos_opt().ok_or(CKConvertErr::InvalidTimestamp)?,
+			timestamp: tts
+				.and_utc()
+				.timestamp_nanos_opt()
+				.ok_or(CKConvertErr::Timestamp)?,
 			trace_id: value[1].as_str().unwrap_or("").to_string(),
 			span_id: value[2].as_str().unwrap_or("").to_string(),
 			severity_text: value[3].as_str().unwrap_or("").to_string(),

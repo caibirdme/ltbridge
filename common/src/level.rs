@@ -52,7 +52,7 @@ impl TryFrom<String> for LogLevel {
 				} else {
 					Err(anyhow!("Invalid log level: {}", value))
 				}
-			},
+			}
 		}
 	}
 }

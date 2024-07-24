@@ -108,7 +108,7 @@ pub struct TraceTable {
 	t: String,
 }
 
-impl<'a> Default for TraceTable {
+impl Default for TraceTable {
 	fn default() -> Self {
 		Self {
 			t: "spans".to_string(),
@@ -174,7 +174,7 @@ fn new_qp(
 	opt: &QueryLimits,
 	schema: TraceTable,
 ) -> QueryPlan<TraceTable, DatabendTraceConverter> {
-	let t = unsafe { std::mem::transmute(opt.range.clone()) };
+	let t = opt.range.clone();
 	let projection = schema.projection();
 	QueryPlan::new(
 		DatabendTraceConverter::new(schema.clone()),

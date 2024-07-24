@@ -2,10 +2,10 @@ use super::QueryLimits;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
+use common::LogLevel;
 use dyn_clone::DynClone;
 use logql::parser::{LogQuery, MetricQuery};
 use std::collections::HashMap;
-use common::LogLevel;
 
 #[async_trait]
 pub trait LogStorage: DynClone + Send + Sync {

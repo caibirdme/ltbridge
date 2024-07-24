@@ -1,15 +1,15 @@
 use super::converter::DatabendLogConverter;
 use crate::storage::{log::*, *};
-use sqlbuilder::{
-	visit::{DefaultIRVisitor,LogQLVisitor},
-	builder::QueryPlan,
-};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use databend_driver::{Connection, Row, TryFromRow};
 use logql::parser::{LogQuery, MetricQuery};
 use sqlbuilder::builder::*;
+use sqlbuilder::{
+	builder::QueryPlan,
+	visit::{DefaultIRVisitor, LogQLVisitor},
+};
 use std::{collections::HashMap, time::Duration};
 use tokio_stream::StreamExt;
 
@@ -55,7 +55,7 @@ impl LogStorage for BendLogQuerier {
 		q: &MetricQuery,
 		opt: QueryLimits,
 	) -> Result<Vec<MetricItem>> {
-		let v = LogQLVisitor::new(DefaultIRVisitor{});
+		let v = LogQLVisitor::new(DefaultIRVisitor {});
 		let selection = v.visit(&q.log_query);
 		let qp = new_from_metricquery(opt, self.schema.clone(), selection);
 		let sql = qp.as_sql();
@@ -85,8 +85,12 @@ impl LogStorage for BendLogQuerier {
 	}
 }
 
-fn logql_to_sql(q: &LogQuery, limits: QueryLimits, schema: &LogTable) -> String {
-	let v = LogQLVisitor::new(DefaultIRVisitor{});
+fn logql_to_sql(
+	q: &LogQuery,
+	limits: QueryLimits,
+	schema: &LogTable,
+) -> String {
+	let v = LogQLVisitor::new(DefaultIRVisitor {});
 	let selection = v.visit(q);
 	let qp = QueryPlan::new(
 		DatabendLogConverter::new(schema.clone()),
@@ -177,13 +181,13 @@ impl TableSchema for LogTable {
 		self.ts_key
 	}
 	fn msg_key(&self) -> &str {
-		&self.msg_key
+		self.msg_key
 	}
 	fn level_key(&self) -> &str {
-		&self.level
+		self.level
 	}
 	fn trace_key(&self) -> &str {
-		&self.trace_id
+		self.trace_id
 	}
 	fn resources_key(&self) -> &str {
 		"resources"
@@ -389,7 +393,7 @@ mod tests {
 			ts_key: "ts",
 			table: "logs",
 			level: "level",
-			trace_id:"trace_id",
+			trace_id: "trace_id",
 		};
 		let plan: QueryPlan<LogTable, DatabendLogConverter> = QueryPlan::new(
 			DatabendLogConverter::new(tb.clone()),
@@ -425,7 +429,7 @@ mod tests {
 			ts_key: "ts",
 			table: "log",
 			level: "level",
-			trace_id:"trace_id",
+			trace_id: "trace_id",
 		};
 		let plan: QueryPlan<LogTable, DatabendLogConverter> = QueryPlan::new(
 			DatabendLogConverter::new(tb.clone()),
