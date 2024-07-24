@@ -1,29 +1,31 @@
-use std::{collections::HashMap, vec};
-use chrono::DateTime;
-use ::clickhouse::{Client, Row};
+use std::collections::HashMap;
+use chrono::{DateTime, NaiveDateTime};
+use reqwest::Client;
 use logql::parser::{LogQuery, MetricQuery};
 use crate::storage::{log::*, *};
+use crate::config::Clickhouse;
 use async_trait::async_trait;
 use sqlbuilder::{
 	builder::{QueryPlan, TableSchema, time_range_into_timing},
 	visit::{DefaultIRVisitor,LogQLVisitor},
 };
+use serde_json::Value as JSONValue;
 use super::{
 	converter::CKLogConverter,
 	common::*,
 };
-use serde::{Deserialize, Serialize};
 use common::LogLevel;
 
 #[derive(Clone)]
 pub struct CKLogQuerier {
     cli: Client,
 	schema: LogTable,
+	ck_cfg: Clickhouse,
 }
 
 impl CKLogQuerier {
-    pub fn new(cli: Client, table: String) -> Self {
-        Self { cli, schema: LogTable::new(table)}
+    pub fn new(cli: Client, table: String, ck_cfg: Clickhouse) -> Self {
+        Self { cli, schema: LogTable::new(table), ck_cfg}
     }
 }
 
@@ -36,9 +38,10 @@ impl LogStorage for CKLogQuerier {
 	) -> Result<Vec<LogItem>> {
 		let sql = logql_to_sql(q, opt, &self.schema);
 		let mut results = vec![]; 
-		let mut cursor = self.cli.query(sql.as_str()).fetch::<LogRecod>()?;
-		while let Some(r) = cursor.next().await? {
-			results.push(r.into());
+		let rows = send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
+		for row in rows {
+			let record = LogRecod::try_from(row)?;
+			results.push(record.into());
 		}
 		Ok(results)
 	}
@@ -49,22 +52,41 @@ impl LogStorage for CKLogQuerier {
 	) -> Result<Vec<MetricItem>> {
 		let sql = new_from_metricquery(q, opt, self.schema.clone());
 		let mut results = vec![];
-		let mut cursor = self.cli.query(sql.as_str()).fetch::<MetricRecord>()?;
-		while let Some(r) = cursor.next().await? {
-			results.push(r.into());
+		let rows = send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
+		for row in rows {
+			let record = MetricRecord::try_from(row)?;
+			results.push(record.into());
 		}
         Ok(results)
 	}
 }
 
-#[derive(Row, Debug, Deserialize)]
+#[derive(Debug)]
 struct MetricRecord {
-	#[serde(rename = "Tts")]
 	ts: i64,
-	#[serde(rename = "SeverityText")]
 	severity_text: String,
-	#[serde(rename = "Total")]
 	total: u64,
+}
+
+impl TryFrom<Vec<JSONValue>> for MetricRecord {
+	type Error = CKConvertErr;
+	fn try_from(value: Vec<JSONValue>) -> std::result::Result<Self, Self::Error> {
+		if value.len() != 3 {
+			return Err(CKConvertErr::InvalidLength);
+		}
+		let ts = value[0].as_str().ok_or(CKConvertErr::InvalidTimestamp)?;
+		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S").map_err(|e| {
+			dbg!(e);
+			CKConvertErr::InvalidTimestamp
+		})?;
+
+		let record = Self {
+			ts: tts.and_utc().timestamp_nanos_opt().ok_or(CKConvertErr::InvalidTimestamp)?,
+			severity_text: value[1].as_str().unwrap_or("").to_string(),
+			total: value[2].as_str().unwrap_or("0").parse().unwrap_or(0),
+		};
+		Ok(record)
+	}
 }
 
 impl From<MetricRecord> for MetricItem {
@@ -95,7 +117,7 @@ fn new_from_metricquery(
 		],
 		selection,
 		vec!["SeverityText".to_string(), "Tts".to_string()],
-		direction_to_sorting(&limits.direction, &schema),
+		vec![],
 		time_range_into_timing(&limits.range),
 		limits.limit,
 	);
@@ -133,18 +155,16 @@ impl LogTable {
 	}
 }
 
-static LOG_TABLE_COLS: [&str; 13] = [
+static LOG_TABLE_COLS: [&str; 11] = [
 	"Timestamp",
 	"TraceId",
 	"SpanId",
 	"SeverityText",
+	"SeverityNumber",
 	"ServiceName",
 	"Body",
-	"ResourceSchemaUrl",
 	"ResourceAttributes",
-	"ScopeSchemaUrl",
 	"ScopeName",
-	"ScopeVersion",
 	"ScopeAttributes",
 	"LogAttributes",
 ];
@@ -165,31 +185,45 @@ static LOG_TABLE_COLS: [&str; 13] = [
 	`ScopeAttributes` Map(LowCardinality(String), String) CODEC(ZSTD(1)),
 	`LogAttributes` Map(LowCardinality(String), String) CODEC(ZSTD(1)),
 */
-#[derive(Row, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct LogRecod {
-	#[serde(rename = "Timestamp")]
 	timestamp: i64,
-	#[serde(rename = "TraceId")]
 	trace_id: String,
-	#[serde(rename = "SpanId")]
 	span_id: String,
-	#[serde(rename = "SeverityText")]
 	severity_text: String,
-	#[serde(rename = "SeverityNumber")]
 	serverity_number: u32,
-	#[serde(rename = "ServiceName")]
 	service_name: String,
-	#[serde(rename = "Body")]
 	body: String,
-	#[serde(rename = "ResourceAttributes")]
 	resource_attr: HashMap<String, String>,
-	#[serde(rename = "ScopeName")]
 	scope_name: String,
-	#[serde(rename = "ScopeAttributes")]
 	scope_attributes: HashMap<String, String>,
-	#[serde(rename = "LogAttributes")]
 	log_attributes: HashMap<String, String>,
+}
 
+impl TryFrom<Vec<JSONValue>> for LogRecod {
+	type Error = CKConvertErr;
+	fn try_from(value: Vec<JSONValue>) -> std::result::Result<Self, Self::Error> {
+		if value.len() != 11 {
+			return Err(CKConvertErr::InvalidLength);
+		}
+		let ts = value[0].as_str().ok_or(CKConvertErr::InvalidTimestamp)?;
+		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f").map_err(|_| CKConvertErr::InvalidTimestamp)?;
+
+		let record = Self {
+			timestamp: tts.and_utc().timestamp_nanos_opt().ok_or(CKConvertErr::InvalidTimestamp)?,
+			trace_id: value[1].as_str().unwrap_or("").to_string(),
+			span_id: value[2].as_str().unwrap_or("").to_string(),
+			severity_text: value[3].as_str().unwrap_or("").to_string(),
+			serverity_number: value[4].as_u64().unwrap_or(0) as u32,
+			service_name: value[5].as_str().unwrap_or("").to_string(),
+			body: value[6].as_str().unwrap_or("").to_string(),
+			resource_attr: json_object_to_map_s_s(&value[7])?,
+			scope_name: value[8].as_str().unwrap_or("").to_string(),
+			scope_attributes: json_object_to_map_s_s(&value[9])?,
+			log_attributes: json_object_to_map_s_s(&value[10])?,
+		};
+		Ok(record)
+	}
 }
 
 impl From<LogRecod> for LogItem {

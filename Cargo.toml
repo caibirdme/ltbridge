@@ -32,7 +32,6 @@ axum-extra = { version = "0.9.3", features = ["protobuf"] }
 axum-valid = "0.19.0"
 chrono = { workspace = true }
 common = { path = "common" }
-clickhouse = "0.11.6"
 config = { version = "0.14.0" }
 databend-driver = { version = "0.18.3" }
 dyn-clone = "1.0.17"
@@ -51,7 +50,7 @@ opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
 ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
 prost = { version = "0.12.6" }
-reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored"], default-features = false }
+reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 serde_with = { version = "3.8.3", features = ["json"] }

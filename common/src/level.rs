@@ -28,14 +28,31 @@ impl TryFrom<String> for LogLevel {
 
 	fn try_from(value: String) -> Result<Self> {
 		use LogLevel::*;
-		match value.to_uppercase().as_str() {
+		let u = value.to_uppercase();
+		match u.as_str() {
 			"TRACE" => Ok(Trace),
 			"DEBUG" => Ok(Debug),
 			"INFO" => Ok(Info),
 			"WARN" => Ok(Warn),
 			"ERROR" => Ok(Error),
 			"FATAL" => Ok(Fatal),
-			_ => Err(anyhow!("Invalid log level: {}", value)),
+			_ => {
+				if u.starts_with("TRACE") {
+					Ok(Trace)
+				} else if u.starts_with("DEBUG") {
+					Ok(Debug)
+				} else if u.starts_with("INFO") {
+					Ok(Info)
+				} else if u.starts_with("WARN") {
+					Ok(Warn)
+				} else if u.starts_with("ERROR") {
+					Ok(Error)
+				} else if u.starts_with("FATAL") {
+					Ok(Fatal)
+				} else {
+					Err(anyhow!("Invalid log level: {}", value))
+				}
+			},
 		}
 	}
 }

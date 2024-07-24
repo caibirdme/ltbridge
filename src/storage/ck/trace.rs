@@ -1,24 +1,31 @@
 use std::collections::HashMap;
 use chrono::DateTime;
-use serde::{Deserialize, Serialize};
-use ::clickhouse::{Row,Client};
+use reqwest::Client;
 use anyhow::Result;
 use async_trait::async_trait;
 use sqlbuilder::builder::*;
 use traceql::*;
 use crate::storage::{trace::*, *};
+use crate::config::Clickhouse;
 use sqlbuilder::builder::{QueryPlan, TableSchema, time_range_into_timing};
-use super::converter::CKLogConverter;
+use super::{
+    converter::CKLogConverter,
+    common::*,
+};
+use serde_json::Value as JSONValue;
+use crate::storage::trace::{SpanEvent, Links};
+use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 
 #[derive(Clone)]
 pub struct CKTraceQuerier {
     client: Client,
     table: String,
+    ck_cfg: Clickhouse,
 }
 
 impl CKTraceQuerier {
-    pub fn new(client: Client, table: String) -> Self {
-        Self { client, table }
+    pub fn new(client: Client, table: String, ck_cfg: Clickhouse) -> Self {
+        Self { client, table, ck_cfg }
     }
 }
 
@@ -31,9 +38,13 @@ impl TraceStorage for CKTraceQuerier {
 	) -> Result<Vec<SpanItem>> {
         let sql = traceid_query_sql(trace_id, opt, TraceTable::new(self.table.clone()));
         let mut results = vec![];
-        let mut cursor = self.client.query(sql.as_str()).fetch::<TraceRecord>()?;
-        while let Some(r) = cursor.next().await? {
-            results.push(r.into());
+        let rows = send_query(self.client.clone(), self.ck_cfg.clone(), sql).await?;
+        for row in rows {
+            let record = TraceRecord::try_from(row).map_err(|e| {
+                dbg!(&e);
+                e
+            })?;
+            results.push(record.into());
         }
         Ok(results)
     }
@@ -126,82 +137,81 @@ static TRACE_TABLE_COLS: [&str; 17] = [
     "Links",
 ];
 
-#[derive(Row, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug)]
 struct TraceRecord {
-    #[serde(rename = "Timestamp")]
     timestamp: i64,
-    #[serde(rename = "TraceId")]
     trace_id: String,
-    #[serde(rename = "SpanId")]
     span_id: String,
-    #[serde(rename = "ParentSpanId")]
     parent_span_id: String,
-    #[serde(rename = "TraceState")]
     trace_state: String,
-    #[serde(rename = "SpanName")]
     span_name: String,
-    #[serde(rename = "SpanKind")]
     span_kind: String,
-    #[serde(rename = "ServiceName")]
     service_name: String,
-    #[serde(rename = "ResourceAttributes")]
-    resource_attributes: HashMap<String, String>,
-    #[serde(rename = "ScopeName")]
+    resource_attributes: HashMap<String, JSONValue>,
     scope_name: String,
-    #[serde(rename = "ScopeVersion")]
     scope_version: String,
-    #[serde(rename = "SpanAttributes")]
-    span_attributes: HashMap<String, String>,
-    #[serde(rename = "Duration")]
+    span_attributes: HashMap<String, JSONValue>,
     duration: i64,
-    #[serde(rename = "StatusCode")]
     status_code: String,
-    #[serde(rename = "StatusMessage")]
     status_message: String,
-    #[serde(rename = "Events.Timestamp")]
-    events_ts: Vec<i64>,
-    #[serde(rename = "Events.Name")]
-    events_name: Vec<String>,
-    #[serde(rename = "Events.Attributes")]
-    events_attributes: Vec<HashMap<String, String>>,
-    #[serde(rename = "Links.TraceId")]
-    links_trace_id: Vec<String>,
-    #[serde(rename = "Links.SpanId")]
-    links_span_id: Vec<String>,
-    #[serde(rename = "Links.TraceState")]
-    links_trace_state: Vec<String>,
-    #[serde(rename = "Links.Attributes")]
-    links_attributes: Vec<HashMap<String, String>>,
+    events: Vec<SpanEvent>,
+    links: Vec<Links>
+}
+
+impl TryFrom<Vec<JSONValue>> for TraceRecord {
+    type Error = CKConvertErr;
+    fn try_from(value: Vec<JSONValue>) -> std::result::Result<Self, Self::Error> {
+        if value.len() != 17 {
+            return Err(CKConvertErr::InvalidLength);
+        }
+        let ts = value[0].as_str().ok_or(CKConvertErr::InvalidTimestamp)?;
+        let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f").map_err(|_| CKConvertErr::InvalidTimestamp)?;
+        let record = Self {
+            timestamp: tts.and_utc().timestamp_nanos_opt().ok_or(CKConvertErr::InvalidTimestamp)?,
+            trace_id: value[1].as_str().unwrap_or("").to_string(),
+            span_id: value[2].as_str().unwrap_or("").to_string(),
+            parent_span_id: value[3].as_str().unwrap_or("").to_string(),
+            trace_state: value[4].as_str().unwrap_or("").to_string(),
+            span_name: value[5].as_str().unwrap_or("").to_string(),
+            span_kind: value[6].as_str().unwrap_or("").to_string(),
+            service_name: value[7].as_str().unwrap_or("").to_string(),
+            resource_attributes: json_object_to_map_s_jsonv(&value[8])?,
+            scope_name: value[9].as_str().unwrap_or("").to_string(),
+            scope_version: value[10].as_str().unwrap_or("").to_string(),
+            span_attributes: json_object_to_map_s_jsonv(&value[11])?,
+            duration: value[12].as_str().unwrap_or("0").parse().map_err(|_| CKConvertErr::InvalidDuration)?,
+            status_code: value[13].as_str().unwrap_or("").to_string(),
+            status_message: value[14].as_str().unwrap_or("").to_string(),
+            events: value[15].as_array().ok_or(CKConvertErr::InvalidArray)?.iter().map(|v| {
+                let obj = v.as_object().ok_or(CKConvertErr::InvalidHashMap)?;
+                let ts = obj.get("Timestamp").ok_or(CKConvertErr::InvalidHashMap)?.as_str().unwrap_or("");
+                Ok(SpanEvent {
+                    ts: NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f").map_err(|_| CKConvertErr::InvalidTimestamp)?,
+                    dropped_attributes_count: 0,
+                    name: obj.get("Name").ok_or(CKConvertErr::InvalidHashMap)?.as_str().ok_or(CKConvertErr::InvalidHashMap)?.to_string(),
+                    attributes: obj.get("Attributes").ok_or(CKConvertErr::InvalidHashMap)?
+                        .as_object().ok_or(CKConvertErr::InvalidHashMap)?
+                        .into_iter().map(|(k, v)| (k.clone(), v.clone())).collect::<HashMap<String, JSONValue>>()
+                })
+            }).collect::<Result<Vec<SpanEvent>, CKConvertErr>>()?,
+            links: value[16].as_array().ok_or(CKConvertErr::InvalidArray)?.iter().map(|v| {
+                let obj = v.as_object().ok_or(CKConvertErr::InvalidHashMap)?;
+                Ok(Links {
+                    trace_id: obj.get("TraceId").ok_or(CKConvertErr::InvalidHashMap)?.as_str().unwrap_or("").to_string(),
+                    span_id: obj.get("SpanId").ok_or(CKConvertErr::InvalidHashMap)?.as_str().unwrap_or("").to_string(),
+                    trace_state: obj.get("TraceState").ok_or(CKConvertErr::InvalidHashMap)?.as_str().unwrap_or("").to_string(),
+                    attributes: obj.get("Attributes").ok_or(CKConvertErr::InvalidHashMap)?
+                    .as_object().ok_or(CKConvertErr::InvalidHashMap)?
+                    .into_iter().map(|(k, v)| (k.clone(), v.clone())).collect::<HashMap<String, JSONValue>>()
+                })
+            }).collect::<Result<Vec<Links>, CKConvertErr>>()?
+        };
+        Ok(record)
+    }
 }
 
 impl From<TraceRecord> for SpanItem {
     fn from(value: TraceRecord) -> Self {
-        let mut events = vec![];
-        for i in 0..value.events_ts.len() {
-            let mut attrs = HashMap::new();
-            for (k, v) in value.events_attributes[i].iter() {
-                attrs.insert(k.clone(), serde_json::from_str(v).unwrap());
-            }
-            events.push(SpanEvent {
-                ts: DateTime::from_timestamp_nanos(value.events_ts[i]).naive_utc(),
-                dropped_attributes_count: 0,
-                name: value.events_name[i].clone(),
-                attributes: attrs,
-            });
-        }
-        let mut links = vec![];
-        for i in 0..value.links_trace_id.len() {
-            let mut attrs = HashMap::new();
-            for (k, v) in value.links_attributes[i].iter() {
-                attrs.insert(k.clone(), serde_json::from_str(v).unwrap());
-            }
-            links.push(Links {
-                trace_id: value.links_trace_id[i].clone(),
-                span_id: value.links_span_id[i].clone(),
-                trace_state: value.links_trace_state[i].clone(),
-                attributes: attrs,
-            });
-        }
         Self {
             ts: DateTime::from_timestamp_nanos(value.timestamp).naive_utc(),
             trace_id: value.trace_id.clone(),
@@ -209,23 +219,19 @@ impl From<TraceRecord> for SpanItem {
             parent_span_id: value.parent_span_id.clone(),
             trace_state: value.trace_state.clone(),
             span_name: value.span_name.clone(),
-            span_kind: value.span_kind.parse().unwrap(),
+            span_kind: SpanKind::from_str_name(&value.span_kind).unwrap_or(SpanKind::Unspecified).into(),
             service_name: value.service_name.clone(),
-            resource_attributes: hash_ss_2_hash_sj(value.resource_attributes),
+            resource_attributes: value.resource_attributes,
             scope_name: str_2_opt_str(&value.scope_name),
             scope_version: str_2_opt_str(&value.scope_version),
-            span_attributes: hash_ss_2_hash_sj(value.span_attributes),
+            span_attributes: value.span_attributes,
             duration: value.duration,
             status_code: value.status_code.parse().ok(),
             status_message: str_2_opt_str(&value.status_message),
-            span_events: events,
-            link: links,
+            span_events: value.events,
+            link: value.links,
         }
     }
-}
-
-fn hash_ss_2_hash_sj(hash: HashMap<String, String>) -> HashMap<String, serde_json::Value> {
-    hash.into_iter().map(|(k, v)| (k, serde_json::from_str(v.as_str()).unwrap())).collect()
 }
 
 fn str_2_opt_str(s: &String) -> Option<String> {
