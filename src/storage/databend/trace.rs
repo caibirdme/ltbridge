@@ -1,9 +1,10 @@
-use super::query_plan::*;
 use crate::storage::{trace::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
+use databend::converter::DatabendTraceConverter;
 use databend_driver::{Connection, Row, TryFromRow};
 use itertools::Itertools;
+use sqlbuilder::builder::*;
 use std::collections::HashMap;
 use tokio_stream::StreamExt;
 use traceql::*;
@@ -11,7 +12,7 @@ use traceql::*;
 #[derive(Clone)]
 pub struct BendTraceQuerier {
 	cli: Box<dyn Connection>,
-	schema: TraceTable<'static>,
+	schema: TraceTable,
 }
 
 impl BendTraceQuerier {
@@ -30,9 +31,9 @@ impl TraceStorage for BendTraceQuerier {
 		trace_id: &str,
 		opt: QueryLimits,
 	) -> Result<Vec<SpanItem>> {
-		let mut qp = new_qp(&opt, &self.schema);
+		let mut qp = new_qp(&opt, self.schema.clone());
 		let conds = vec![Condition {
-			column: self.schema.trace_key().to_string(),
+			column: Column::TraceID,
 			cmp: Cmp::Equal(PlaceValue::String(trace_id.to_string())),
 		}];
 		let selection = Some(conditions_into_selection(conds.as_slice()));
@@ -103,19 +104,21 @@ CREATE TABLE spans (
 ) ENGINE = FUSE CLUSTER BY (TO_YYYYMMDDHH(ts));
 */
 #[derive(Debug, Clone)]
-struct TraceTable<'a> {
-	t: &'a str,
+pub struct TraceTable {
+	t: String,
 }
 
-impl<'a> Default for TraceTable<'a> {
+impl Default for TraceTable {
 	fn default() -> Self {
-		Self { t: "spans" }
+		Self {
+			t: "spans".to_string(),
+		}
 	}
 }
 
-impl TraceTable<'_> {
+impl TraceTable {
 	fn table_name(&self) -> &str {
-		self.t
+		&self.t
 	}
 	fn projection(&self) -> Vec<String> {
 		vec![
@@ -143,28 +146,46 @@ impl TraceTable<'_> {
 	}
 }
 
-impl<'a> TableSchema for TraceTable<'a> {
+impl TableSchema for TraceTable {
 	fn table(&self) -> &str {
 		self.table_name()
 	}
 	fn ts_key(&self) -> &str {
 		"ts"
 	}
+	fn msg_key(&self) -> &str {
+		""
+	}
+	fn level_key(&self) -> &str {
+		""
+	}
+	fn trace_key(&self) -> &str {
+		self.trace_key()
+	}
+	fn resources_key(&self) -> &str {
+		"resource_attributes"
+	}
+	fn attributes_key(&self) -> &str {
+		"span_attributes"
+	}
 }
 
-fn new_qp<'a>(
-	opt: &'a QueryLimits,
-	schema: &'a TraceTable,
-) -> QueryPlan<'a, TraceTable<'a>> {
-	QueryPlan {
+fn new_qp(
+	opt: &QueryLimits,
+	schema: TraceTable,
+) -> QueryPlan<TraceTable, DatabendTraceConverter> {
+	let t = opt.range.clone();
+	let projection = schema.projection();
+	QueryPlan::new(
+		DatabendTraceConverter::new(schema.clone()),
 		schema,
-		projection: schema.projection(),
-		selection: None,
-		grouping: vec![],
-		sorting: vec![],
-		timing: time_range_into_timing(&opt.range),
-		limit: opt.limit,
-	}
+		projection,
+		None,
+		vec![],
+		vec![],
+		time_range_into_timing(&t),
+		opt.limit,
+	)
 }
 
 /*
@@ -208,14 +229,14 @@ WHERE sp.span_id IN (
 )
 */
 
-struct ComplexQuery<'a> {
-	schema: TraceTable<'a>,
-	span_selections: Vec<QueryPlan<'a, TraceTable<'a>>>,
-	trace_selections: SubQuery<'a>,
+struct ComplexQuery {
+	schema: TraceTable,
+	span_selections: Vec<QueryPlan<TraceTable, DatabendTraceConverter>>,
+	trace_selections: SubQuery,
 	limits: QueryLimits,
 }
 
-impl<'a> ComplexQuery<'a> {
+impl ComplexQuery {
 	fn as_sql(&self) -> String {
 		let mut sql = format!(
 			"SELECT {} FROM {} sp WHERE sp.span_id IN (SELECT span_id FROM (",
@@ -243,13 +264,13 @@ impl<'a> ComplexQuery<'a> {
 	}
 }
 
-enum SubQuery<'a> {
-	Basic(QueryPlan<'a, TraceTable<'a>>),
-	And(Box<SubQuery<'a>>, Box<SubQuery<'a>>),
-	Or(Box<SubQuery<'a>>, Box<SubQuery<'a>>),
+enum SubQuery {
+	Basic(QueryPlan<TraceTable, DatabendTraceConverter>),
+	And(Box<SubQuery>, Box<SubQuery>),
+	Or(Box<SubQuery>, Box<SubQuery>),
 }
 
-impl<'a> SubQuery<'a> {
+impl SubQuery {
 	fn as_sql(&self) -> String {
 		match self {
 			SubQuery::Basic(qp) => {
@@ -279,7 +300,7 @@ fn field_value_to_place_value(f: &FieldValue) -> PlaceValue {
 }
 
 fn construct_condition(
-	key: String,
+	key: Column,
 	value: PlaceValue,
 	op: ComparisonOperator,
 ) -> Condition {
@@ -329,27 +350,27 @@ fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 	match &expr.kv {
 		FieldType::Intrinsic(intrisinc) => match intrisinc {
 			IntrisincField::Status(status) => construct_condition(
-				"status_code".to_string(),
+				Column::Raw("status_code".to_string()),
 				PlaceValue::Integer((*status).into()),
 				expr.operator,
 			),
 			IntrisincField::Duraion(d) => construct_condition(
-				"duration".to_string(),
+				Column::Raw("duration".to_string()),
 				PlaceValue::Integer(d.as_nanos() as i64),
 				expr.operator,
 			),
 			IntrisincField::Kind(kind) => construct_condition(
-				"span_kind".to_string(),
+				Column::Raw("span_kind".to_string()),
 				PlaceValue::Integer((*kind).into()),
 				expr.operator,
 			),
 			IntrisincField::Name(name) => construct_condition(
-				"span_name".to_string(),
+				Column::Raw("span_name".to_string()),
 				PlaceValue::String(name.clone()),
 				expr.operator,
 			),
 			IntrisincField::ServiceName(name) => construct_condition(
-				"service_name".to_string(),
+				Column::Raw("service_name".to_string()),
 				PlaceValue::String(name.clone()),
 				expr.operator,
 			),
@@ -358,7 +379,7 @@ fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 		FieldType::Resource(key, val) => {
 			let value = field_value_to_place_value(val);
 			construct_condition(
-				format!("resource_attributes['{}']", key),
+				Column::Resources(key.clone()),
 				value,
 				expr.operator,
 			)
@@ -366,7 +387,7 @@ fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 		FieldType::Span(key, val) => {
 			let value = field_value_to_place_value(val);
 			construct_condition(
-				format!("span_attributes['{}']", key),
+				Column::Attributes(key.clone()),
 				value,
 				expr.operator,
 			)
@@ -411,16 +432,16 @@ fn spanset_to_qp(spanset: &SpanSet) -> Selection {
 	}
 }
 
-fn new_from_expression<'a>(
-	expr: &'a Expression,
-	opt: &'a QueryLimits,
-	schema: &'a TraceTable,
-	spans: &mut Vec<QueryPlan<'a, TraceTable<'a>>>,
-) -> SubQuery<'a> {
+fn new_from_expression(
+	expr: &Expression,
+	opt: &QueryLimits,
+	schema: &TraceTable,
+	spans: &mut Vec<QueryPlan<TraceTable, DatabendTraceConverter>>,
+) -> SubQuery {
 	match expr {
 		Expression::SpanSet(spanset) => {
 			let selection = spanset_to_qp(spanset);
-			let mut qp = new_qp(opt, schema);
+			let mut qp = new_qp(opt, schema.clone());
 			qp.limit = None;
 			qp.projection = vec!["span_id".to_string(), "trace_id".to_string()];
 			qp.selection = Some(selection);
@@ -499,6 +520,7 @@ fn row_into_spanitem(row: Row) -> Result<SpanItem> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use common::TimeRange;
 	use pretty_assertions::assert_eq;
 	use sqlparser::{dialect::AnsiDialect, parser::Parser};
 	use std::{fs, path::PathBuf};

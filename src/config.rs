@@ -55,11 +55,22 @@ pub struct Databend {
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
+pub struct Clickhouse {
+	pub url: String,
+	pub database: String,
+	pub username: String,
+	pub password: String,
+	pub table: String,
+}
+
+#[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
 pub enum DataSource {
 	#[serde(rename = "databend")]
 	Databend(Databend),
 	#[serde(rename = "quickwit")]
 	Quickwit(Quickwit),
+	#[serde(rename = "clickhouse")]
+	Clickhouse(Clickhouse),
 }
 
 fn default_driver() -> String {

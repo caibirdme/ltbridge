@@ -1,9 +1,10 @@
 use super::*;
-use crate::{errors::AppError, state::AppState, storage::TimeRange};
+use crate::{errors::AppError, state::AppState};
 use axum::{
 	extract::{Path, Query, State},
 	Json,
 };
+use common::TimeRange;
 
 pub async fn query_labels(
 	State(state): State<AppState>,

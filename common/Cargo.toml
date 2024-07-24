@@ -1,0 +1,10 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76.0"
+authors = ["caibirdme <492877816@qq.com>"]
+
+[dependencies]
+chrono = {workspace=true}
+anyhow = { version = "1.0.86"}

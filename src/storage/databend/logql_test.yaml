@@ -1,11 +1,11 @@
 expand_tags:
-  input: '{app="foo",   attributes.uid="123"}'
+  input: '{app="foo",   attributes_uid="123"}'
   expect: |
-    SELECT app,server,trace_id,span_id,level,tags,message,ts FROM logs WHERE (app='foo' AND attributes['uid']='123')
+    SELECT app,server,trace_id,span_id,level,tags,message,timestamp FROM logs WHERE (app='foo' AND attributes['uid']='123')
 with_filters:
-  input: '{app="foo",   attributes.uid="123"} |= "haha" |=  "xixi" '
+  input: '{app="foo",   attributes_uid="123"} |= "haha" |=  "xixi" '
   expect: |
-    SELECT app, server, trace_id, span_id, level, tags, message, ts FROM logs WHERE 
+    SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE 
       (app = 'foo' AND 
         (attributes['uid'] = '123' AND 
           (message LIKE '%haha%' AND message LIKE '%xixi%')
@@ -13,9 +13,9 @@ with_filters:
       )
 with_filters_use_inverted_index:
   inverted: true
-  input: '{app="foo",   resources.uid="123"} |= "haha" |=  "xixi" '
+  input: '{app="foo",   resources_uid="123"} |= "haha" |=  "xixi" '
   expect: |
-    SELECT app, server, trace_id, span_id, level, tags, message, ts FROM logs WHERE 
+    SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE 
       (app = 'foo' AND 
         (resources['uid'] = '123' AND 
           (MATCH(message,'haha') AND MATCH(message,'xixi'))
@@ -24,9 +24,9 @@ with_filters_use_inverted_index:
 search_level:
   input: '{level="info"}'
   expect: |
-    SELECT app, server, trace_id, span_id, level, tags, message, ts FROM logs WHERE level=9
+    SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE level=9
 search_empty_filter:
   input: '{level="info"} |= "" |= "hello"'
   expect: |
-    SELECT app, server, trace_id, span_id, level, tags, message, ts FROM logs WHERE 
+    SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE 
       (level=9 AND message LIKE '%hello%')

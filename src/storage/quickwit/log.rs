@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::{
 	qwdsl::{self, Clause, Query, TermCtx, Unary},
 	sdk::{self, *},
@@ -9,6 +7,7 @@ use crate::storage::{log::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::DateTime;
+use common::LogLevel;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use logql::parser::{
@@ -16,6 +15,7 @@ use logql::parser::{
 	Operator,
 };
 use serde_json::Value as JSONValue;
+use std::collections::HashMap;
 
 static LABEL_ALIAS: [(&str, &str); 1] = [("severity_text", "level")];
 

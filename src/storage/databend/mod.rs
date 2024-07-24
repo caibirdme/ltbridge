@@ -3,8 +3,8 @@ use crate::config::Databend;
 use anyhow::Result;
 use databend_driver::{Client, Connection};
 
+pub(crate) mod converter;
 pub mod log;
-pub(crate) mod query_plan;
 pub mod trace;
 
 pub async fn new_log_source(cfg: Databend) -> Result<Box<dyn LogStorage>> {
@@ -17,8 +17,8 @@ pub async fn new_log_source(cfg: Databend) -> Result<Box<dyn LogStorage>> {
 	Ok(Box::new(q))
 }
 
-// 查询日志volume的metrics时要把时间转成In64，设置numeric_cast_option = 'truncating'
-// 保证所有的数值都向下取整，不然会出现不一致
+// when query volume of logs overtime, set numeric_cast_option = 'truncating'
+// to ensure time column is truncated to integer(floor)
 async fn init_log_source(conn: Box<dyn Connection>) -> Result<()> {
 	conn.exec("SET numeric_cast_option = 'truncating';").await?;
 	Ok(())

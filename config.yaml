@@ -8,10 +8,16 @@ server:
     # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
     filter_directives: info,tower_http=off,databend_client=off
 log_source:
-  quickwit:
-    domain: http://127.0.0.1:7280
-    index: otel-logs-v0_7
-    timeout: 30s
+  clickhouse:
+    url: http://127.0.0.1:8123
+    database: default
+    table: otel_logs
+    username: default
+    password: a11221122a
+  # quickwit:
+  #   domain: http://127.0.0.1:7280
+  #   index: otel-logs-v0_7
+  #   timeout: 30s
   # databend:
   #   drvier: databend
   #   domain: localhost
@@ -22,10 +28,16 @@ log_source:
   #   # use fulltext index(if you have databend commercial license), otherwise false
   #   inverted_index: true
 trace_source:
-  quickwit:
-    domain: http://127.0.0.1:7280
-    index: otel-traces-v0_7
-    timeout: 30s
+  clickhouse:
+    url: http://127.0.0.1:8123
+    database: default
+    table: otel_traces
+    username: default
+    password: a11221122a
+  # quickwit:
+  #   domain: http://127.0.0.1:7280
+  #   index: otel-traces-v0_7
+  #   timeout: 30s
   # databend:
   #   drvier: databend
   #   domain: localhost

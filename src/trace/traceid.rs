@@ -1,9 +1,7 @@
 use super::*;
 use crate::{
-	errors::AppError,
-	proto::tempopb::Trace,
-	state::AppState,
-	storage::{QueryLimits, TimeRange},
+	errors::AppError, proto::tempopb::Trace, state::AppState,
+	storage::QueryLimits,
 };
 use anyhow::anyhow;
 use axum::{
@@ -15,6 +13,7 @@ use axum::{
 };
 use axum_extra::protobuf::Protobuf;
 use chrono::DateTime;
+use common::TimeRange;
 use itertools::Itertools;
 use moka::sync::Cache;
 use opentelemetry_proto::tonic::resource::v1::Resource;

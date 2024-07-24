@@ -1,7 +1,6 @@
-use std::fmt::Display;
-
-use crate::storage::TimeRange;
 use chrono::NaiveDateTime;
+use common::TimeRange;
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cmp {
@@ -11,8 +10,6 @@ pub enum Cmp {
 	RegexNotMatch(String),
 	Contains(String),
 	NotContains(String),
-	Match(String),
-	NotMatch(String),
 	Larger(PlaceValue),
 	LargerEqual(PlaceValue),
 	Less(PlaceValue),
@@ -45,8 +42,19 @@ pub enum Selection {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Condition {
-	pub column: String,
+	pub column: Column,
 	pub cmp: Cmp,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Column {
+	Message,
+	Timestamp,
+	Level,
+	TraceID,
+	Resources(String),
+	Attributes(String),
+	Raw(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,22 +72,54 @@ pub enum OrdType {
 pub trait TableSchema {
 	fn table(&self) -> &str;
 	fn ts_key(&self) -> &str;
+	fn msg_key(&self) -> &str;
+	fn level_key(&self) -> &str;
+	fn trace_key(&self) -> &str;
+	fn resources_key(&self) -> &str;
+	fn attributes_key(&self) -> &str;
 }
 
 #[derive(Debug, Clone)]
-pub struct QueryPlan<'a, T: TableSchema> {
-	pub schema: &'a T,
+pub struct QueryPlan<T: TableSchema, C: QueryConverter> {
+	converter: C,
+	pub schema: T,
 	pub projection: Vec<String>,
 	pub selection: Option<Selection>,
-	pub grouping: Vec<&'a str>,
-	pub sorting: Vec<(&'a str, SortType)>,
+	pub grouping: Vec<String>,
+	pub sorting: Vec<(String, SortType)>,
 	pub timing: Vec<(OrdType, NaiveDateTime)>,
 	pub limit: Option<u32>,
 }
 
-impl<'a, T> QueryPlan<'a, T>
+impl<T: TableSchema, C: QueryConverter> QueryPlan<T, C> {
+	#[allow(clippy::too_many_arguments)]
+	pub fn new(
+		converter: C,
+		schema: T,
+		projection: Vec<String>,
+		selection: Option<Selection>,
+		grouping: Vec<String>,
+		sorting: Vec<(String, SortType)>,
+		timing: Vec<(OrdType, NaiveDateTime)>,
+		limit: Option<u32>,
+	) -> Self {
+		Self {
+			converter,
+			schema,
+			projection,
+			selection,
+			grouping,
+			sorting,
+			timing,
+			limit,
+		}
+	}
+}
+
+impl<T, C> QueryPlan<T, C>
 where
 	T: TableSchema,
+	C: QueryConverter,
 {
 	pub fn as_sql(&self) -> String {
 		let mut sql = self.projection_part();
@@ -116,40 +156,24 @@ where
 	fn projection_part(&self) -> String {
 		format!("SELECT {}", self.projection.join(","))
 	}
-	fn convert_unit(c: &Condition) -> String {
-		match &c.cmp {
-			Cmp::Equal(v) => format!("{} = {}", c.column, v),
-			Cmp::NotEqual(v) => format!("{} != {}", c.column, v),
-			Cmp::Larger(v) => format!("{} > {}", c.column, v),
-			Cmp::LargerEqual(v) => format!("{} >= {}", c.column, v),
-			Cmp::Less(v) => format!("{} < {}", c.column, v),
-			Cmp::LessEqual(v) => format!("{} <= {}", c.column, v),
-			Cmp::RegexMatch(v) => format!("{} REGEXP '{}'", c.column, v),
-			Cmp::RegexNotMatch(v) => format!("{} NOT REGEXP '{}'", c.column, v),
-			Cmp::Contains(v) => format!("{} LIKE '%{}%'", c.column, v),
-			Cmp::NotContains(v) => format!("{} NOT LIKE '%{}%'", c.column, v),
-			Cmp::Match(v) => format!("MATCH({},'{}')", c.column, v),
-			Cmp::NotMatch(v) => format!("NOT MATCH({},'{}')", c.column, v),
-		}
-	}
-	fn selection_to_sql(s: &Selection) -> String {
+	fn selection_to_sql(&self, s: &Selection) -> String {
 		match s {
-			Selection::Unit(ref c) => Self::convert_unit(c),
+			Selection::Unit(ref c) => self.converter.convert_condition(c),
 			Selection::LogicalAnd(ref l, ref r) => {
-				let l = Self::selection_to_sql(l);
-				let r = Self::selection_to_sql(r);
+				let l = self.selection_to_sql(l);
+				let r = self.selection_to_sql(r);
 				format!("({} AND {})", l, r)
 			}
 			Selection::LogicalOr(ref l, ref r) => {
-				let l = Self::selection_to_sql(l);
-				let r = Self::selection_to_sql(r);
+				let l = self.selection_to_sql(l);
+				let r = self.selection_to_sql(r);
 				format!("({} OR {})", l, r)
 			}
 		}
 	}
 	fn selection_part(&self) -> String {
 		if let Some(s) = &self.selection {
-			Self::selection_to_sql(s)
+			self.selection_to_sql(s)
 		} else {
 			"".to_string()
 		}
@@ -176,26 +200,12 @@ where
 		let ts_key = self.schema.ts_key();
 		self.timing
 			.iter()
-			.map(|(o, t)| {
-				let ts = micro_time(t);
-				match o {
-					OrdType::LargerEqual => {
-						format!("{}>='{}'", ts_key, ts)
-					}
-					OrdType::SmallerEqual => {
-						format!("{}<='{}'", ts_key, ts)
-					}
-				}
-			})
+			.map(|(o, t)| self.converter.convert_timing(ts_key, o, t))
 			.collect()
 	}
 	fn limit_part(&self) -> Option<String> {
 		self.limit.map(|l| format!("LIMIT {}", l))
 	}
-}
-
-pub fn micro_time(t: &NaiveDateTime) -> String {
-	t.format("%Y-%m-%d %H:%M:%S%.6f").to_string()
 }
 
 pub fn time_range_into_timing(
@@ -218,6 +228,16 @@ pub fn conditions_into_selection(conds: &[Condition]) -> Selection {
 	let left = conditions_into_selection(&conds[..1]);
 	let right = conditions_into_selection(&conds[1..]);
 	Selection::LogicalAnd(Box::new(left), Box::new(right))
+}
+
+pub trait QueryConverter {
+	fn convert_condition(&self, c: &Condition) -> String;
+	fn convert_timing(
+		&self,
+		ts_key: &str,
+		o: &OrdType,
+		t: &NaiveDateTime,
+	) -> String;
 }
 
 #[cfg(test)]

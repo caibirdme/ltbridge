@@ -1,0 +1,12 @@
+[package]
+name = "sqlbuilder"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76.0"
+authors = ["caibirdme <492877816@qq.com>"]
+
+[dependencies]
+chrono ={ workspace = true }
+ordered-float = {workspace = true}
+common = {path = "../common"}
+logql = {path = "../logql"}
