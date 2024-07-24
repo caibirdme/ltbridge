@@ -33,7 +33,7 @@ axum-valid = "0.19.0"
 chrono = { workspace = true }
 common = { path = "common" }
 config = { version = "0.14.0" }
-databend-driver = { version = "0.18.3" }
+databend-driver = { version = "0.19.5" }
 dyn-clone = "1.0.17"
 hex = { version = "0.4.3" }
 http = "1.1.0"
@@ -45,7 +45,7 @@ moka = { version = "0.12.8", features = ["default", "sync"] }
 opentelemetry = { version = "0.23.0", features = ["metrics"] }
 opentelemetry-prometheus = "0.16.0"
 opentelemetry-proto = { version = "0.6.0", features = ["full"] }
-opentelemetry-semantic-conventions = { version = "0.15.0" }
+opentelemetry-semantic-conventions = { version = "0.16.0" }
 opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
 ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
@@ -53,10 +53,10 @@ prost = { version = "0.12.6" }
 reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120" }
-serde_with = { version = "3.8.3", features = ["json"] }
+serde_with = { version = "3.9.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
-thiserror = { version = "1.0.62" }
-tokio = { version = "1.38.0", features = ["full"] }
+thiserror = { version = "1.0.63" }
+tokio = { version = "1.38.1", features = ["full"] }
 tokio-stream = { version = "0.1.15" }
 tower = { version = "0.4.13" }
 tower-http = { version = "0.5.2", features = [
