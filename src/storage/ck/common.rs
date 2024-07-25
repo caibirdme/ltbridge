@@ -71,7 +71,6 @@ pub(crate) async fn send_query(
 	cfg: Clickhouse,
 	sql: String,
 ) -> Result<Vec<Vec<JSONValue>>> {
-	dbg!(&sql);
 	let req = cli
 		.post(cfg.url.clone())
 		.query(&[
@@ -86,7 +85,6 @@ pub(crate) async fn send_query(
 		.basic_auth(cfg.username.clone(), Some(cfg.password.clone()))
 		.build()?;
 	let res = cli.execute(req).await?.text().await?;
-	dbg!(&res);
 	let resp: RecordWarpper = serde_json::from_str(&res)?;
 	Ok(resp.data)
 }
