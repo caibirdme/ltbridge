@@ -1,4 +1,4 @@
-name: Build latest image
+name: Build latest images
 
 on:
   workflow_dispatch:
@@ -14,22 +14,27 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: 1.79.0
         profile: minimal
         override: true
+        target: ${{ matrix.target }}
 
     - name: Install cross
       run: cargo install cross
 
     - name: Build with cross
-      run: cross build --target x86_64-unknown-linux-musl --release
+      run: cross build --target ${{ matrix.target }} --release
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -46,5 +51,7 @@ jobs:
       with:
         context: .
         push: true
-        tags: ghcr.io/${{ github.repository }}:${{ github.event.inputs.tag }}
+        tags: ghcr.io/${{ github.repository }}:${{ github.event.inputs.tag }}-${{ matrix.target }}
         file: Dockerfile
+        build-args: |
+          TARGET=${{ matrix.target }}
