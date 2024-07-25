@@ -34,6 +34,7 @@ trace_source:
     table: otel_traces
     username: default
     password: a11221122a
+    trace_ts_table: otel_traces_trace_id_ts
   # quickwit:
   #   domain: http://127.0.0.1:7280
   #   index: otel-traces-v0_7

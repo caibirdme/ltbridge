@@ -64,13 +64,27 @@ pub struct Clickhouse {
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
+pub struct ClickhouseTrace {
+	#[serde(flatten)]
+	pub common: Clickhouse,
+	pub trace_ts_table: String,
+}
+
+#[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum ClickhouseConf {
+	Trace(ClickhouseTrace),
+	Log(Clickhouse),
+}
+
+#[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
 pub enum DataSource {
 	#[serde(rename = "databend")]
 	Databend(Databend),
 	#[serde(rename = "quickwit")]
 	Quickwit(Quickwit),
 	#[serde(rename = "clickhouse")]
-	Clickhouse(Clickhouse),
+	Clickhouse(ClickhouseConf),
 }
 
 fn default_driver() -> String {

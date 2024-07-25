@@ -1,4 +1,4 @@
-use crate::config::DataSource;
+use crate::config::{ClickhouseConf, DataSource};
 use anyhow::Result;
 use chrono::NaiveDateTime;
 use std::time::Duration;
@@ -32,7 +32,12 @@ pub async fn new_trace_source(
 	match d {
 		DataSource::Databend(cfg) => databend::new_trace_source(cfg).await,
 		DataSource::Quickwit(cfg) => quickwit::new_trace_source(cfg).await,
-		DataSource::Clickhouse(cfg) => ck::new_trace_source(cfg).await,
+		DataSource::Clickhouse(cfg) => match cfg {
+			ClickhouseConf::Trace(cfg) => ck::new_trace_source(cfg).await,
+			ClickhouseConf::Log(_) => {
+				panic!("cannot use ck log config for trace source")
+			}
+		},
 	}
 }
 
@@ -40,6 +45,11 @@ pub async fn new_log_source(d: DataSource) -> Result<Box<dyn log::LogStorage>> {
 	match d {
 		DataSource::Databend(cfg) => databend::new_log_source(cfg).await,
 		DataSource::Quickwit(cfg) => quickwit::new_log_source(cfg).await,
-		DataSource::Clickhouse(cfg) => ck::new_log_source(cfg).await,
+		DataSource::Clickhouse(cfg) => match cfg {
+			ClickhouseConf::Log(cfg) => ck::new_log_source(cfg).await,
+			ClickhouseConf::Trace(_) => {
+				panic!("cannot use ck trace config for log source")
+			}
+		},
 	}
 }

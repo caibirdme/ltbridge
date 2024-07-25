@@ -1,5 +1,5 @@
 use super::common::*;
-use crate::config::Clickhouse;
+use crate::config::ClickhouseTrace;
 use crate::storage::trace::{Links, SpanEvent};
 use crate::storage::{trace::*, *};
 use anyhow::Result;
@@ -15,16 +15,20 @@ use traceql::*;
 #[derive(Clone)]
 pub struct CKTraceQuerier {
 	client: Client,
-	ck_cfg: Clickhouse,
+	ck_cfg: ClickhouseTrace,
 	schema: TraceTable,
 }
 
 impl CKTraceQuerier {
-	pub fn new(client: Client, table: String, ck_cfg: Clickhouse) -> Self {
+	pub fn new(client: Client, table: String, ck_cfg: ClickhouseTrace) -> Self {
 		Self {
 			client,
 			ck_cfg: ck_cfg.clone(),
-			schema: TraceTable::new(table, ck_cfg.database),
+			schema: TraceTable::new(
+				table,
+				ck_cfg.common.database,
+				ck_cfg.trace_ts_table,
+			),
 		}
 	}
 }
@@ -39,7 +43,8 @@ impl TraceStorage for CKTraceQuerier {
 		let sql = traceid_query_sql(trace_id, opt, self.schema.clone());
 		let mut results = vec![];
 		let rows =
-			send_query(self.client.clone(), self.ck_cfg.clone(), sql).await?;
+			send_query(self.client.clone(), self.ck_cfg.common.clone(), sql)
+				.await?;
 		for row in rows {
 			let record = TraceRecord::try_from(row).map_err(|e| {
 				dbg!(&e);
@@ -63,20 +68,24 @@ fn traceid_query_sql(
 	_: QueryLimits,
 	schema: TraceTable,
 ) -> String {
+	let db = schema.database();
+	let trace_ts_table = schema.trace_ts_table();
 	let sql = format!(
 		r#"
 WITH
 	'{}' as trace_id,
-	(SELECT min(Start) FROM {}.otel_traces_trace_id_ts WHERE TraceId = trace_id) as start,
-	(SELECT max(End) + 1 FROM {}.otel_traces_trace_id_ts WHERE TraceId = trace_id) as end
+	(SELECT min(Start) FROM {}.{} WHERE TraceId = trace_id) as start,
+	(SELECT max(End) + 1 FROM {}.{} WHERE TraceId = trace_id) as end
 SELECT {} FROM {}
 WHERE TraceId = trace_id
 AND Timestamp >= start
 AND Timestamp <= end
 "#,
 		trace_id,
-		schema.database(),
-		schema.database(),
+		db,
+		trace_ts_table,
+		db,
+		trace_ts_table,
 		schema.projection().join(","),
 		schema.full_table(),
 	);
@@ -87,11 +96,20 @@ AND Timestamp <= end
 struct TraceTable {
 	table: String,
 	database: String,
+	trace_ts_table: String,
 }
 
 impl TraceTable {
-	pub fn new(table: String, database: String) -> Self {
-		Self { table, database }
+	pub fn new(
+		table: String,
+		database: String,
+		trace_ts_table: String,
+	) -> Self {
+		Self {
+			table,
+			database,
+			trace_ts_table,
+		}
 	}
 	fn projection(&self) -> Vec<String> {
 		TRACE_TABLE_COLS.iter().map(|s| s.to_string()).collect()
@@ -101,6 +119,9 @@ impl TraceTable {
 	}
 	fn full_table(&self) -> String {
 		format!("{}.{}", self.database, self.table)
+	}
+	fn trace_ts_table(&self) -> &str {
+		self.trace_ts_table.as_str()
 	}
 }
 /*
