@@ -24,7 +24,8 @@ impl CKLogQuerier {
 	pub fn new(cli: Client, table: String, ck_cfg: Clickhouse) -> Self {
 		Self {
 			cli,
-			schema: LogTable::new(table),
+			// since we use http, we should use the full table name(database.table)
+			schema: LogTable::new(format!("{}.{}", ck_cfg.database, table)),
 			ck_cfg,
 		}
 	}
