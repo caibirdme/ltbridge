@@ -18,10 +18,7 @@ jobs:
         profile: minimal
         override: true
     - name: Install binstall
-      uses: actions-rs/cargo@v1
-      with:
-        command: install
-        args: cargo-binstall
+      run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
     - name: Install checkers
       uses: actions-rs/cargo@v1
       with:
