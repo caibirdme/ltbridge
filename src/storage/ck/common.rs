@@ -10,7 +10,7 @@ use thiserror::Error;
 
 pub fn to_start_interval(step: Duration) -> &'static str {
 	let sec = step.as_secs();
-	let v = if sec < 5 {
+	if sec < 5 {
 		"toStartOfSecond(Timestamp) as Tts"
 	} else if sec < 10 {
 		"toStartOfInterval(Timestamp, INTERVAL 5 SECOND) as Tts"
@@ -40,10 +40,7 @@ pub fn to_start_interval(step: Duration) -> &'static str {
 		"toStartOfMonth(Timestamp) as Tts"
 	} else {
 		"toStartOfYear(Timestamp) as Tts"
-	};
-	dbg!(step);
-	dbg!(v);
-	v
+	}
 }
 
 pub fn direction_to_sorting(

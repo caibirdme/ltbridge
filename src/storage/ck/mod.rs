@@ -1,5 +1,5 @@
 use super::{log::LogStorage, trace::TraceStorage};
-use crate::config::Clickhouse;
+use crate::config::{Clickhouse, ClickhouseTrace};
 use anyhow::Result;
 use reqwest::Client;
 use std::time::Duration;
@@ -22,7 +22,7 @@ pub async fn new_log_source(cfg: Clickhouse) -> Result<Box<dyn LogStorage>> {
 }
 
 pub async fn new_trace_source(
-	cfg: Clickhouse,
+	cfg: ClickhouseTrace,
 ) -> Result<Box<dyn TraceStorage>> {
 	let cli = Client::builder()
 		.gzip(true)
@@ -30,7 +30,7 @@ pub async fn new_trace_source(
 		.build()?;
 	Ok(Box::new(trace::CKTraceQuerier::new(
 		cli,
-		cfg.table.clone(),
+		cfg.common.table.clone(),
 		cfg,
 	)))
 }
