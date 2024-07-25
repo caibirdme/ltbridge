@@ -258,7 +258,7 @@ trace_source:
     password: a11221122a
 ```
 
-**Note:** Since there's no available rust clickhouse sdk that supports nested type and map at the same time, ltbridge has no choice but to use http + jsoneachrow, so 8123 is required.
+**Note:** Since there's no available rust clickhouse sdk that supports both nested type and map type, ltbridge has no choice but to use http + jsoneachrow, so 8123 is required.
 
 ### Try search in grafana
 

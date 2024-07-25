@@ -52,6 +52,4 @@ jobs:
         context: .
         push: true
         tags: ghcr.io/${{ github.repository }}:${{ github.event.inputs.tag }}-${{ matrix.target }}
-        file: Dockerfile
-        build-args: |
-          TARGET=${{ matrix.target }}
+        file: ${{ matrix.target }}/Dockerfile
