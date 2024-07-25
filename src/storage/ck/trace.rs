@@ -1,4 +1,4 @@
-use super::{common::*, converter::CKLogConverter};
+use super::common::*;
 use crate::config::Clickhouse;
 use crate::storage::trace::{Links, SpanEvent};
 use crate::storage::{trace::*, *};
@@ -8,24 +8,23 @@ use chrono::DateTime;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use reqwest::Client;
 use serde_json::Value as JSONValue;
-use sqlbuilder::builder::*;
-use sqlbuilder::builder::{time_range_into_timing, QueryPlan, TableSchema};
+use sqlbuilder::builder::TableSchema;
 use std::collections::HashMap;
 use traceql::*;
 
 #[derive(Clone)]
 pub struct CKTraceQuerier {
 	client: Client,
-	table: String,
 	ck_cfg: Clickhouse,
+	schema: TraceTable,
 }
 
 impl CKTraceQuerier {
 	pub fn new(client: Client, table: String, ck_cfg: Clickhouse) -> Self {
 		Self {
 			client,
-			table,
-			ck_cfg,
+			ck_cfg: ck_cfg.clone(),
+			schema: TraceTable::new(table, ck_cfg.database),
 		}
 	}
 }
@@ -37,11 +36,7 @@ impl TraceStorage for CKTraceQuerier {
 		trace_id: &str,
 		opt: QueryLimits,
 	) -> Result<Vec<SpanItem>> {
-		let sql = traceid_query_sql(
-			trace_id,
-			opt,
-			TraceTable::new(self.table.clone()),
-		);
+		let sql = traceid_query_sql(trace_id, opt, self.schema.clone());
 		let mut results = vec![];
 		let rows =
 			send_query(self.client.clone(), self.ck_cfg.clone(), sql).await?;
@@ -65,38 +60,47 @@ impl TraceStorage for CKTraceQuerier {
 
 fn traceid_query_sql(
 	trace_id: &str,
-	limits: QueryLimits,
+	_: QueryLimits,
 	schema: TraceTable,
 ) -> String {
-	let conds = vec![Condition {
-		column: Column::TraceID,
-		cmp: Cmp::Equal(PlaceValue::String(trace_id.to_string())),
-	}];
-	let selection = Some(conditions_into_selection(conds.as_slice()));
-	let qp = QueryPlan::new(
-		CKLogConverter::new(schema.clone()),
-		schema.clone(),
-		schema.projection(),
-		selection,
-		vec![],
-		vec![],
-		time_range_into_timing(&limits.range),
-		limits.limit,
+	let sql = format!(
+		r#"
+WITH
+	'{}' as trace_id,
+	(SELECT min(Start) FROM {}.otel_traces_trace_id_ts WHERE TraceId = trace_id) as start,
+	(SELECT max(End) + 1 FROM {}.otel_traces_trace_id_ts WHERE TraceId = trace_id) as end
+SELECT {} FROM {}
+WHERE TraceId = trace_id
+AND Timestamp >= start
+AND Timestamp <= end
+"#,
+		trace_id,
+		schema.database(),
+		schema.database(),
+		schema.projection().join(","),
+		schema.full_table(),
 	);
-	qp.as_sql()
+	sql
 }
 
 #[derive(Clone)]
 struct TraceTable {
 	table: String,
+	database: String,
 }
 
 impl TraceTable {
-	pub fn new(table: String) -> Self {
-		Self { table }
+	pub fn new(table: String, database: String) -> Self {
+		Self { table, database }
 	}
 	fn projection(&self) -> Vec<String> {
 		TRACE_TABLE_COLS.iter().map(|s| s.to_string()).collect()
+	}
+	fn database(&self) -> &str {
+		self.database.as_str()
+	}
+	fn full_table(&self) -> String {
+		format!("{}.{}", self.database, self.table)
 	}
 }
 /*
