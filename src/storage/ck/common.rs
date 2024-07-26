@@ -72,6 +72,7 @@ pub(crate) async fn send_query(
 		.post(cfg.url.clone())
 		.query(&[
 			("default_format", "JSONCompact"),
+			("date_time_output_format", "unix_timestamp"), // this is required to handle
 			("add_http_cors_header", "1"),
 			("result_overflow_mode", "break"),
 			("max_result_rows", "1000"),

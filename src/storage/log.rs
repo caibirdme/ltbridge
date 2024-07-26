@@ -1,7 +1,7 @@
 use super::QueryLimits;
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{offset::Utc, DateTime};
 use common::LogLevel;
 use dyn_clone::DynClone;
 use logql::parser::{LogQuery, MetricQuery};
@@ -35,7 +35,7 @@ dyn_clone::clone_trait_object!(LogStorage);
 
 #[derive(Debug, Clone)]
 pub struct LogItem {
-	pub ts: NaiveDateTime,
+	pub ts: DateTime<Utc>,
 	pub trace_id: String,
 	pub span_id: String,
 	pub level: LogLevel,
@@ -51,5 +51,5 @@ pub struct LogItem {
 pub struct MetricItem {
 	pub level: LogLevel,
 	pub total: u64,
-	pub ts: NaiveDateTime,
+	pub ts: DateTime<Utc>,
 }

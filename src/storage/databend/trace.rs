@@ -497,7 +497,7 @@ fn row_into_spanitem(row: Row) -> Result<SpanItem> {
 	let events: Vec<SpanEvent> = serde_json::from_str(&raw.span_events)?;
 	let links: Vec<Links> = serde_json::from_str(&raw.link)?;
 	Ok(SpanItem {
-		ts: raw.ts,
+		ts: raw.ts.and_utc(),
 		trace_id: raw.trace_id,
 		span_id: raw.span_id,
 		parent_span_id: raw.parent_span_id,

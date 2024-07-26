@@ -1,0 +1,84 @@
+{
+        "meta": [
+            {
+                "name": "Timestamp",
+                "type": "DateTime64(9)"
+            },
+            {
+                "name": "TraceId",
+                "type": "String"
+            },
+            {
+                "name": "SpanId",
+                "type": "String"
+            },
+            {
+                "name": "SeverityText",
+                "type": "LowCardinality(String)"
+            },
+            {
+                "name": "SeverityNumber",
+                "type": "UInt8"
+            },
+            {
+                "name": "ServiceName",
+                "type": "LowCardinality(String)"
+            },
+            {
+                "name": "Body",
+                "type": "String"
+            },
+            {
+                "name": "ResourceAttributes",
+                "type": "Map(LowCardinality(String), String)"
+            },
+            {
+                "name": "ScopeName",
+                "type": "String"
+            },
+            {
+                "name": "ScopeAttributes",
+                "type": "Map(LowCardinality(String), String)"
+            },
+            {
+                "name": "LogAttributes",
+                "type": "Map(LowCardinality(String), String)"
+            }
+        ],
+        "data": [
+            [
+                "1721981562.326079232",
+                "2a4aa700ea743a8ffb5b1d1dde88fbe8",
+                "90bfeddd7a186091",
+                "debug",
+                0,
+                "",
+                "hahah",
+                {
+                    "env": "stable",
+                    "instance": "0.0.0.0",
+                    "server": "api-svr",
+                    "tps.tenant.id": "default"
+                },
+                "",
+                {
+    
+                },
+                {
+                    "line": "log.go:53",
+                    "sampled": "true",
+                    "system": "",
+                    "client_version": "",
+                    "uri": "\/foo\/bar",
+                    "instance": "172.18.53.7"
+                }
+            ]
+        ],
+        "rows": 3,
+        "rows_before_limit_at_least": 3,
+        "statistics": {
+            "elapsed": 0.240881858,
+            "rows_read": 274392,
+            "bytes_read": 10809606
+        }
+    }

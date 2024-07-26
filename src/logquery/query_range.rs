@@ -112,12 +112,7 @@ fn to_metric_query_range_response(value: &[MetricItem]) -> QueryRangeResponse {
 			)]),
 			values: elements
 				.iter()
-				.map(|e| {
-					[
-						e.ts.and_utc().timestamp().into(),
-						e.total.to_string().into(),
-					]
-				})
+				.map(|e| [e.ts.timestamp().into(), e.total.to_string().into()])
 				.collect(),
 		})
 		.collect();
@@ -159,7 +154,7 @@ fn to_log_query_range_response(
 			StreamValue {
 				stream: tags,
 				values: vec![[
-					r.ts.and_utc().timestamp_nanos_opt().unwrap().to_string(),
+					r.ts.timestamp_nanos_opt().unwrap().to_string(),
 					r.message.clone(),
 				]],
 			}

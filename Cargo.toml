@@ -2,7 +2,7 @@
 name = "ltbridge"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.79.0"
+rust-version = "1.80.0"
 authors = ["caibirdme <492877816@qq.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
