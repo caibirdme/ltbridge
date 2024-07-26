@@ -12,6 +12,7 @@ use sqlbuilder::{
 	visit::{DefaultIRVisitor, LogQLVisitor},
 };
 use std::collections::HashMap;
+use tracing::error;
 
 #[derive(Clone)]
 pub struct CKLogQuerier {
@@ -40,10 +41,17 @@ impl LogStorage for CKLogQuerier {
 	) -> Result<Vec<LogItem>> {
 		let sql = logql_to_sql(q, opt, &self.schema);
 		let mut results = vec![];
-		let rows =
-			send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await?;
+		let rows = send_query(self.cli.clone(), self.ck_cfg.clone(), sql)
+			.await
+			.map_err(|e| {
+				error!("Query log error: {:?}", e);
+				e
+			})?;
 		for row in rows {
-			let record = LogRecod::try_from(row)?;
+			let record = LogRecod::try_from(row).map_err(|e| {
+				error!("Convert log record error: {:?}", e);
+				e
+			})?;
 			results.push(record.into());
 		}
 		Ok(results)

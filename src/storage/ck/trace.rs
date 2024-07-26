@@ -4,13 +4,15 @@ use crate::storage::trace::{Links, SpanEvent};
 use crate::storage::{trace::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
+use itertools::izip;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use reqwest::Client;
 use serde_json::Value as JSONValue;
 use sqlbuilder::builder::TableSchema;
 use std::collections::HashMap;
 use traceql::*;
+use tracing::error;
 
 #[derive(Clone)]
 pub struct CKTraceQuerier {
@@ -44,10 +46,14 @@ impl TraceStorage for CKTraceQuerier {
 		let mut results = vec![];
 		let rows =
 			send_query(self.client.clone(), self.ck_cfg.common.clone(), sql)
-				.await?;
+				.await
+				.map_err(|e| {
+					error!("Query trace error: {:?}", e);
+					e
+				})?;
 		for row in rows {
 			let record = TraceRecord::try_from(row).map_err(|e| {
-				dbg!(&e);
+				error!("Convert trace record error: {:?}", e);
 				e
 			})?;
 			results.push(record.into());
@@ -152,7 +158,7 @@ impl TraceTable {
 		 Attributes Map(LowCardinality(String), String)
 	 ) CODEC(ZSTD(1))
 */
-static TRACE_TABLE_COLS: [&str; 17] = [
+static TRACE_TABLE_COLS: [&str; 22] = [
 	"Timestamp",
 	"TraceId",
 	"SpanId",
@@ -168,8 +174,13 @@ static TRACE_TABLE_COLS: [&str; 17] = [
 	"Duration",
 	"StatusCode",
 	"StatusMessage",
-	"Events",
-	"Links",
+	"Events.Timestamp",
+	"Events.Name",
+	"Events.Attributes",
+	"Links.TraceId",
+	"Links.SpanId",
+	"Links.TraceState",
+	"Links.Attributes",
 ];
 
 #[derive(Debug)]
@@ -189,8 +200,13 @@ struct TraceRecord {
 	duration: i64,
 	status_code: String,
 	status_message: String,
-	events: Vec<SpanEvent>,
-	links: Vec<Links>,
+	events_ts: Vec<DateTime<Utc>>,
+	events_name: Vec<String>,
+	events_attrs: Vec<HashMap<String, JSONValue>>,
+	links_trace_id: Vec<String>,
+	links_span_id: Vec<String>,
+	links_trace_state: Vec<String>,
+	links_attrs: Vec<HashMap<String, JSONValue>>,
 }
 
 impl TryFrom<Vec<JSONValue>> for TraceRecord {
@@ -198,7 +214,7 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 	fn try_from(
 		value: Vec<JSONValue>,
 	) -> std::result::Result<Self, Self::Error> {
-		if value.len() != 17 {
+		if value.len() != 22 {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
@@ -226,75 +242,13 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 				.map_err(|_| CKConvertErr::Duration)?,
 			status_code: value[13].as_str().unwrap_or("").to_string(),
 			status_message: value[14].as_str().unwrap_or("").to_string(),
-			events: value[15]
-				.as_array()
-				.ok_or(CKConvertErr::Array)?
-				.iter()
-				.map(|v| {
-					let obj = v.as_object().ok_or(CKConvertErr::HashMap)?;
-					let ts = obj
-						.get("Timestamp")
-						.ok_or(CKConvertErr::HashMap)?
-						.as_str()
-						.unwrap_or("");
-					Ok(SpanEvent {
-						ts: DateTime::parse_from_str(ts, "%s.%9f")
-							.map(|v| v.to_utc())
-							.map_err(|_| CKConvertErr::Timestamp)?,
-						dropped_attributes_count: 0,
-						name: obj
-							.get("Name")
-							.ok_or(CKConvertErr::HashMap)?
-							.as_str()
-							.ok_or(CKConvertErr::HashMap)?
-							.to_string(),
-						attributes: obj
-							.get("Attributes")
-							.ok_or(CKConvertErr::HashMap)?
-							.as_object()
-							.ok_or(CKConvertErr::HashMap)?
-							.into_iter()
-							.map(|(k, v)| (k.clone(), v.clone()))
-							.collect::<HashMap<String, JSONValue>>(),
-					})
-				})
-				.collect::<Result<Vec<SpanEvent>, CKConvertErr>>()?,
-			links: value[16]
-				.as_array()
-				.ok_or(CKConvertErr::Array)?
-				.iter()
-				.map(|v| {
-					let obj = v.as_object().ok_or(CKConvertErr::HashMap)?;
-					Ok(Links {
-						trace_id: obj
-							.get("TraceId")
-							.ok_or(CKConvertErr::HashMap)?
-							.as_str()
-							.unwrap_or("")
-							.to_string(),
-						span_id: obj
-							.get("SpanId")
-							.ok_or(CKConvertErr::HashMap)?
-							.as_str()
-							.unwrap_or("")
-							.to_string(),
-						trace_state: obj
-							.get("TraceState")
-							.ok_or(CKConvertErr::HashMap)?
-							.as_str()
-							.unwrap_or("")
-							.to_string(),
-						attributes: obj
-							.get("Attributes")
-							.ok_or(CKConvertErr::HashMap)?
-							.as_object()
-							.ok_or(CKConvertErr::HashMap)?
-							.into_iter()
-							.map(|(k, v)| (k.clone(), v.clone()))
-							.collect::<HashMap<String, JSONValue>>(),
-					})
-				})
-				.collect::<Result<Vec<Links>, CKConvertErr>>()?,
+			events_ts: json_array_to_date(&value[15])?,
+			events_name: json_array_string(&value[16])?,
+			events_attrs: json_array_hashmap(&value[17])?,
+			links_trace_id: json_array_string(&value[18])?,
+			links_span_id: json_array_string(&value[19])?,
+			links_trace_state: json_array_string(&value[20])?,
+			links_attrs: json_array_hashmap(&value[21])?,
 		};
 		Ok(record)
 	}
@@ -320,8 +274,31 @@ impl From<TraceRecord> for SpanItem {
 			duration: value.duration,
 			status_code: value.status_code.parse().ok(),
 			status_message: str_2_opt_str(&value.status_message),
-			span_events: value.events,
-			link: value.links,
+			span_events: izip!(
+				value.events_ts,
+				value.events_name,
+				value.events_attrs
+			)
+			.map(|(ts, name, attributes)| SpanEvent {
+				ts,
+				dropped_attributes_count: 0,
+				name,
+				attributes,
+			})
+			.collect(),
+			link: izip!(
+				value.links_trace_id,
+				value.links_span_id,
+				value.links_trace_state,
+				value.links_attrs
+			)
+			.map(|(trace_id, span_id, trace_state, attributes)| Links {
+				trace_id,
+				span_id,
+				trace_state,
+				attributes,
+			})
+			.collect(),
 		}
 	}
 }

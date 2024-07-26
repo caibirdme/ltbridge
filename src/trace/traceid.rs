@@ -11,9 +11,10 @@ use axum::{
 	response::{IntoResponse, Response},
 	Json,
 };
-use axum_extra::protobuf::Protobuf;
+use bytes::BytesMut;
 use chrono::DateTime;
 use common::TimeRange;
+use http::StatusCode;
 use itertools::Itertools;
 use moka::sync::Cache;
 use opentelemetry_proto::tonic::resource::v1::Resource;
@@ -159,6 +160,25 @@ impl IntoResponse for GetTraceByIDResponse {
 				([(header::CONTENT_TYPE, "application/json")], json)
 					.into_response()
 			}
+		}
+	}
+}
+
+#[derive(Debug)]
+// When axum-extra fixes the incompetibility with prost 0.13.1
+// we can remove this struct and use the one from axum-extra
+pub struct Protobuf<T>(T);
+
+impl<T> IntoResponse for Protobuf<T>
+where
+	T: Message,
+{
+	fn into_response(self) -> Response {
+		let mut buf = BytesMut::with_capacity(128);
+		match self.0.encode(&mut buf) {
+			Ok(()) => buf.into_response(),
+			Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+				.into_response(),
 		}
 	}
 }

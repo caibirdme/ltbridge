@@ -7,7 +7,7 @@ use axum::{
 };
 use chrono::{TimeDelta, Utc};
 use opentelemetry::{
-	metrics::{Counter, Histogram, MeterProvider as _, Unit},
+	metrics::{Counter, Histogram, MeterProvider as _},
 	KeyValue,
 };
 use opentelemetry_sdk::metrics::{self, SdkMeterProvider};
@@ -87,7 +87,7 @@ pub fn setup_metrcis() -> Instrumentations {
 		.init();
 	let http_request_duration = meter
 		.f64_histogram(HTTP_REQUEST_DURATION_SECONDS)
-		.with_unit(Unit::new("s"))
+		.with_unit("s")
 		.with_description("The HTTP request latencies in seconds")
 		.init();
 	Instrumentations {
