@@ -41,8 +41,9 @@ impl LogStorage for CKLogQuerier {
 	) -> Result<Vec<LogItem>> {
 		let sql = logql_to_sql(q, opt, &self.schema);
 		let mut results = vec![];
-		let rows =
-			send_query(self.cli.clone(), self.ck_cfg.clone(), sql).await.map_err(|e| {
+		let rows = send_query(self.cli.clone(), self.ck_cfg.clone(), sql)
+			.await
+			.map_err(|e| {
 				error!("Query log error: {:?}", e);
 				e
 			})?;

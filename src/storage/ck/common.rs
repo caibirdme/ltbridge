@@ -169,6 +169,6 @@ pub(crate) fn json_array_hashmap(
 		.as_array()
 		.ok_or(CKConvertErr::Array)?
 		.iter()
-		.map(|v| json_object_to_map_s_jsonv(v))
+		.map(json_object_to_map_s_jsonv)
 		.collect()
 }

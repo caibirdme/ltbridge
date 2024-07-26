@@ -46,7 +46,8 @@ impl TraceStorage for CKTraceQuerier {
 		let mut results = vec![];
 		let rows =
 			send_query(self.client.clone(), self.ck_cfg.common.clone(), sql)
-				.await.map_err(|e| {
+				.await
+				.map_err(|e| {
 					error!("Query trace error: {:?}", e);
 					e
 				})?;
@@ -278,7 +279,6 @@ impl From<TraceRecord> for SpanItem {
 				value.events_name,
 				value.events_attrs
 			)
-			.into_iter()
 			.map(|(ts, name, attributes)| SpanEvent {
 				ts,
 				dropped_attributes_count: 0,
@@ -292,7 +292,6 @@ impl From<TraceRecord> for SpanItem {
 				value.links_trace_state,
 				value.links_attrs
 			)
-			.into_iter()
 			.map(|(trace_id, span_id, trace_state, attributes)| Links {
 				trace_id,
 				span_id,
