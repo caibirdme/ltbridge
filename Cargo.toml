@@ -28,8 +28,8 @@ pretty_assertions = "1.4.0"
 anyhow = "1.0.86"
 async-trait = "0.1.81"
 axum = { version = "0.7.5", features = ["default"] }
-axum-extra = { version = "0.9.3", features = ["protobuf"] }
 axum-valid = "0.19.0"
+bytes = "1.6.1"
 chrono = { workspace = true }
 common = { path = "common" }
 config = { version = "0.14.0" }
@@ -42,14 +42,14 @@ itertools = { version = "0.13.0" }
 lazy_static = "1.5.0"
 logql = { path = "logql" }
 moka = { version = "0.12.8", features = ["default", "sync"] }
-opentelemetry = { version = "0.23.0", features = ["metrics"] }
-opentelemetry-prometheus = "0.16.0"
-opentelemetry-proto = { version = "0.6.0", features = ["full"] }
+opentelemetry = { version = "0.24.0", features = ["metrics"] }
+opentelemetry-prometheus = "0.17.0"
+opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 opentelemetry-semantic-conventions = { version = "0.16.0" }
-opentelemetry_sdk = { version = "0.23.0", features = ["metrics"] }
+opentelemetry_sdk = { version = "0.24.1", features = ["metrics"] }
 ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
-prost = { version = "0.12.6" }
+prost = { version = "0.13.1" }
 reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120" }

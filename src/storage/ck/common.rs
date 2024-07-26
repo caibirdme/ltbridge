@@ -1,6 +1,8 @@
 use crate::config::Clickhouse;
 use crate::storage::Direction;
 use anyhow::Result;
+use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use reqwest::{header::CONTENT_TYPE, Client};
 use serde::Deserialize;
 use serde_json::Value as JSONValue;
@@ -99,6 +101,8 @@ pub enum CKConvertErr {
 	Duration,
 	#[error("Invalid array")]
 	Array,
+	#[error("Invalid string")]
+	String,
 }
 
 pub(crate) fn json_object_to_map_s_s(
@@ -121,4 +125,50 @@ pub(crate) fn json_object_to_map_s_jsonv(
 		.as_object()
 		.map(|o| o.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
 		.ok_or(CKConvertErr::HashMap)
+}
+
+pub(crate) fn json_array_to_date(
+	value: &JSONValue,
+) -> std::result::Result<Vec<DateTime<Utc>>, CKConvertErr> {
+	value
+		.as_array()
+		.map(|a| {
+			a.iter()
+				.map(|v| {
+					let ts = v.as_str().ok_or(CKConvertErr::Timestamp)?;
+					DateTime::parse_from_str(ts, "%s%.9f")
+						.map_err(|_| CKConvertErr::Timestamp)
+						.map(|v| v.to_utc())
+				})
+				.collect_vec()
+				.into_iter()
+				.collect::<Result<Vec<_>, _>>()
+		})
+		.ok_or(CKConvertErr::Timestamp)?
+}
+
+pub(crate) fn json_array_string(
+	value: &JSONValue,
+) -> std::result::Result<Vec<String>, CKConvertErr> {
+	value
+		.as_array()
+		.ok_or(CKConvertErr::Array)?
+		.iter()
+		.map(|v| {
+			v.as_str()
+				.ok_or(CKConvertErr::String)
+				.map(|v| v.to_string())
+		})
+		.collect()
+}
+
+pub(crate) fn json_array_hashmap(
+	value: &JSONValue,
+) -> std::result::Result<Vec<HashMap<String, JSONValue>>, CKConvertErr> {
+	value
+		.as_array()
+		.ok_or(CKConvertErr::Array)?
+		.iter()
+		.map(|v| json_object_to_map_s_jsonv(v))
+		.collect()
 }
