@@ -116,7 +116,6 @@ pub async fn search_trace_v2(
 					name: v.span_name.clone(),
 					start_time_unix_nano: v
 						.ts
-						.and_utc()
 						.timestamp_nanos_opt()
 						.unwrap() as u64,
 					duration_nanos: v.duration as u64,
@@ -178,16 +177,16 @@ fn get_root_name_map(
 			let w = arr
 				.iter()
 				.max_by(|x, y| {
-					let x_time = x.ts.and_utc().timestamp_nanos_opt().unwrap()
+					let x_time = x.ts.timestamp_nanos_opt().unwrap()
 						+ x.duration;
-					let y_time = y.ts.and_utc().timestamp_nanos_opt().unwrap()
+					let y_time = y.ts.timestamp_nanos_opt().unwrap()
 						+ y.duration;
 					x_time.cmp(&y_time)
 				})
 				.unwrap();
 			(
 				k,
-				(w.ts.and_utc().timestamp_nanos_opt().unwrap() + w.duration)
+				(w.ts.timestamp_nanos_opt().unwrap() + w.duration)
 					as u64,
 			)
 		})
@@ -201,7 +200,7 @@ fn get_root_name_map(
 				(
 					sp.span_name.clone(),
 					sp.service_name.clone(),
-					sp.ts.and_utc().timestamp_nanos_opt().unwrap() as u64,
+					sp.ts.timestamp_nanos_opt().unwrap() as u64,
 					endtime_map.get(&sp.trace_id).copied().unwrap_or(100000000),
 				),
 			);

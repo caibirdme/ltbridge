@@ -202,11 +202,10 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f")
+		let tts = DateTime::parse_from_str(ts, "%s.%9f")
 			.map_err(|_| CKConvertErr::Timestamp)?;
 		let record = Self {
 			timestamp: tts
-				.and_utc()
 				.timestamp_nanos_opt()
 				.ok_or(CKConvertErr::Timestamp)?,
 			trace_id: value[1].as_str().unwrap_or("").to_string(),
@@ -239,10 +238,10 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 						.as_str()
 						.unwrap_or("");
 					Ok(SpanEvent {
-						ts: NaiveDateTime::parse_from_str(
+						ts: DateTime::parse_from_str(
 							ts,
-							"%Y-%m-%d %H:%M:%S.%9f",
-						)
+							"%s.%9f",
+						).map(|v| v.to_utc())
 						.map_err(|_| CKConvertErr::Timestamp)?,
 						dropped_attributes_count: 0,
 						name: obj
@@ -306,7 +305,7 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 impl From<TraceRecord> for SpanItem {
 	fn from(value: TraceRecord) -> Self {
 		Self {
-			ts: DateTime::from_timestamp_nanos(value.timestamp).naive_utc(),
+			ts: DateTime::from_timestamp_nanos(value.timestamp),
 			trace_id: value.trace_id.clone(),
 			span_id: value.span_id.clone(),
 			parent_span_id: value.parent_span_id.clone(),

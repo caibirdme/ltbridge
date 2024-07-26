@@ -1,7 +1,7 @@
 use super::QueryLimits;
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, offset::Utc};
 use dyn_clone::DynClone;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ dyn_clone::clone_trait_object!(TraceStorage);
 
 #[derive(Debug, Default, Clone)]
 pub struct SpanItem {
-	pub ts: NaiveDateTime,
+	pub ts: DateTime<Utc>,
 	pub trace_id: String,
 	pub span_id: String,
 	pub parent_span_id: String,
@@ -58,7 +58,7 @@ pub struct SpanItem {
 pub struct SpanEvent {
 	#[serde(rename = "time_unix_nano")]
 	#[serde(deserialize_with = "deserialize_naivedatetime")]
-	pub ts: NaiveDateTime,
+	pub ts: DateTime<Utc>,
 	pub dropped_attributes_count: u32,
 	pub name: String,
 	pub attributes: HashMap<String, serde_json::Value>,
@@ -74,7 +74,7 @@ pub struct Links {
 
 fn deserialize_naivedatetime<'de, D>(
 	deserializer: D,
-) -> Result<NaiveDateTime, D::Error>
+) -> Result<DateTime<Utc>, D::Error>
 where
 	D: Deserializer<'de>,
 {
@@ -84,12 +84,12 @@ where
 
 static DATETIME_FORMATS: [&str; 3] = ["%+", "%c", "%s"];
 
-fn parse_datetime(s: &str) -> Result<NaiveDateTime> {
+fn parse_datetime(s: &str) -> Result<DateTime<Utc>> {
 	// try best effort to parse datetime
 	// https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 	for format in DATETIME_FORMATS {
-		if let Ok(d) = NaiveDateTime::parse_from_str(s, format) {
-			return Ok(d);
+		if let Ok(d) = DateTime::parse_from_str(s, format) {
+			return Ok(d.to_utc());
 		}
 	}
 	Err(anyhow::anyhow!("invalid datetime format"))

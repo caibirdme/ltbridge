@@ -147,8 +147,7 @@ fn flatten_volume_agg_response(
 		.into_iter()
 		.flat_map(|b| {
 			let ts = DateTime::from_timestamp_millis(b.key.floor() as i64)
-				.unwrap()
-				.naive_utc();
+				.unwrap();
 			b.levels
 				.buckets
 				.into_iter()
@@ -248,8 +247,7 @@ fn build_search_query(
 fn record_to_logitem(r: LogRecord) -> LogItem {
 	let level = get_level(&r);
 	LogItem {
-		ts: DateTime::from_timestamp_nanos(r.timestamp_nanos as i64)
-			.naive_utc(),
+		ts: DateTime::from_timestamp_nanos(r.timestamp_nanos as i64),
 		trace_id: r.trace_id.unwrap_or("".to_string()),
 		span_id: r.span_id.unwrap_or("".to_string()),
 		level,

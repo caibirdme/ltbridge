@@ -68,7 +68,7 @@ impl LogStorage for BendLogQuerier {
 			metrics.push(MetricItem {
 				level: level.into(),
 				total,
-				ts: nts,
+				ts: nts.and_utc(),
 			});
 		}
 		Ok(metrics)
@@ -122,7 +122,7 @@ struct LogRaw {
 fn row_into_logitem(row: Row) -> Result<LogItem> {
 	let row: LogRaw = row.try_into().map_err(|e: String| anyhow::anyhow!(e))?;
 	Ok(LogItem {
-		ts: row.ts,
+		ts: row.ts.and_utc(),
 		trace_id: row.trace_id,
 		span_id: row.span_id,
 		level: row.level.into(),

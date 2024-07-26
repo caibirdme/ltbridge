@@ -2,7 +2,7 @@ use super::{common::*, converter::CKLogConverter};
 use crate::config::Clickhouse;
 use crate::storage::{log::*, *};
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime};
+use chrono::DateTime;
 use common::LogLevel;
 use logql::parser::{LogQuery, MetricQuery};
 use reqwest::Client;
@@ -81,7 +81,7 @@ impl TryFrom<Vec<JSONValue>> for MetricRecord {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S")
+		let tts = DateTime::parse_from_str(ts, "%s")
 			.map_err(|e| {
 				dbg!(e);
 				CKConvertErr::Timestamp
@@ -89,7 +89,6 @@ impl TryFrom<Vec<JSONValue>> for MetricRecord {
 
 		let record = Self {
 			ts: tts
-				.and_utc()
 				.timestamp_nanos_opt()
 				.ok_or(CKConvertErr::Timestamp)?,
 			severity_text: value[1].as_str().unwrap_or("").to_string(),
@@ -105,7 +104,7 @@ impl From<MetricRecord> for MetricItem {
 			level: LogLevel::try_from(r.severity_text)
 				.unwrap_or(LogLevel::Trace),
 			total: r.total,
-			ts: DateTime::from_timestamp_nanos(r.ts).naive_utc(),
+			ts: DateTime::from_timestamp_nanos(r.ts),
 		}
 	}
 }
@@ -220,12 +219,11 @@ impl TryFrom<Vec<JSONValue>> for LogRecod {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S.%9f")
+		let tts = DateTime::parse_from_str(ts, "%s.%9f")
 			.map_err(|_| CKConvertErr::Timestamp)?;
 
 		let record = Self {
 			timestamp: tts
-				.and_utc()
 				.timestamp_nanos_opt()
 				.ok_or(CKConvertErr::Timestamp)?,
 			trace_id: value[1].as_str().unwrap_or("").to_string(),
@@ -246,7 +244,7 @@ impl TryFrom<Vec<JSONValue>> for LogRecod {
 impl From<LogRecod> for LogItem {
 	fn from(r: LogRecod) -> Self {
 		Self {
-			ts: DateTime::from_timestamp_nanos(r.timestamp).naive_utc(),
+			ts: DateTime::from_timestamp_nanos(r.timestamp),
 			trace_id: r.trace_id,
 			span_id: r.span_id,
 			level: if r.severity_text.is_empty() {
@@ -285,5 +283,25 @@ impl TableSchema for LogTable {
 	}
 	fn resources_key(&self) -> &str {
 		"ResourceAttributes"
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use anyhow::Result;
+	use pretty_assertions::assert_eq;
+	#[test]
+	fn test_decode_log_resp() -> Result<()> {
+		// read json file from "./testdata/log.json"
+		use std::fs;
+		let v = fs::read_to_string("./testdata/ck/log_resp.json")?;
+		let resp: RecordWarpper = serde_json::from_str(&v)?;
+		assert_eq!(resp.data.len(), 1);
+		for d in resp.data {
+			let w: LogRecod = d.try_into()?;
+			assert_eq!(w.trace_id, "2a4aa700ea743a8ffb5b1d1dde88fbe8");
+		}
+		Ok(())
 	}
 }

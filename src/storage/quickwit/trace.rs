@@ -2,7 +2,7 @@ use super::{sdk, *};
 use crate::storage::{trace::*, *};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value as JSONValue;
@@ -64,7 +64,7 @@ pub struct QuickwitSpan {
 		rename = "span_start_timestamp_nanos",
 		deserialize_with = "deserialize_timestamp"
 	)]
-	pub ts: NaiveDateTime,
+	pub ts: DateTime<Utc>,
 	pub trace_id: String,
 	pub span_id: String,
 	pub parent_span_id: Option<String>,
@@ -160,7 +160,7 @@ pub struct QuickwitSpanEvent {
 		rename = "event_timestamp_nanos",
 		deserialize_with = "deserialize_timestamp"
 	)]
-	pub event_timestamp: NaiveDateTime,
+	pub event_timestamp: DateTime<Utc>,
 	#[serde(default)]
 	pub event_attributes: HashMap<String, JSONValue>,
 }
@@ -176,12 +176,12 @@ pub struct QuickwitLinks {
 // Function to deserialize timestamp from nanoseconds
 fn deserialize_timestamp<'de, D>(
 	deserializer: D,
-) -> Result<NaiveDateTime, D::Error>
+) -> Result<DateTime<Utc>, D::Error>
 where
 	D: Deserializer<'de>,
 {
 	let nanos: i64 = Deserialize::deserialize(deserializer)?;
-	Ok(DateTime::from_timestamp_nanos(nanos).naive_utc())
+	Ok(DateTime::from_timestamp_nanos(nanos))
 }
 
 const fn default_status_code() -> Option<i32> {
