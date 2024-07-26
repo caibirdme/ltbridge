@@ -146,8 +146,8 @@ fn flatten_volume_agg_response(
 		.buckets
 		.into_iter()
 		.flat_map(|b| {
-			let ts = DateTime::from_timestamp_millis(b.key.floor() as i64)
-				.unwrap();
+			let ts =
+				DateTime::from_timestamp_millis(b.key.floor() as i64).unwrap();
 			b.levels
 				.buckets
 				.into_iter()

@@ -112,12 +112,7 @@ fn to_metric_query_range_response(value: &[MetricItem]) -> QueryRangeResponse {
 			)]),
 			values: elements
 				.iter()
-				.map(|e| {
-					[
-						e.ts.timestamp().into(),
-						e.total.to_string().into(),
-					]
-				})
+				.map(|e| [e.ts.timestamp().into(), e.total.to_string().into()])
 				.collect(),
 		})
 		.collect();

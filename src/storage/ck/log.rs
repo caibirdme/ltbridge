@@ -81,16 +81,13 @@ impl TryFrom<Vec<JSONValue>> for MetricRecord {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = DateTime::parse_from_str(ts, "%s")
-			.map_err(|e| {
-				dbg!(e);
-				CKConvertErr::Timestamp
-			})?;
+		let tts = DateTime::parse_from_str(ts, "%s").map_err(|e| {
+			dbg!(e);
+			CKConvertErr::Timestamp
+		})?;
 
 		let record = Self {
-			ts: tts
-				.timestamp_nanos_opt()
-				.ok_or(CKConvertErr::Timestamp)?,
+			ts: tts.timestamp_nanos_opt().ok_or(CKConvertErr::Timestamp)?,
 			severity_text: value[1].as_str().unwrap_or("").to_string(),
 			total: value[2].as_str().unwrap_or("0").parse().unwrap_or(0),
 		};

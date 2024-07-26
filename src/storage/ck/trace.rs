@@ -238,11 +238,9 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 						.as_str()
 						.unwrap_or("");
 					Ok(SpanEvent {
-						ts: DateTime::parse_from_str(
-							ts,
-							"%s.%9f",
-						).map(|v| v.to_utc())
-						.map_err(|_| CKConvertErr::Timestamp)?,
+						ts: DateTime::parse_from_str(ts, "%s.%9f")
+							.map(|v| v.to_utc())
+							.map_err(|_| CKConvertErr::Timestamp)?,
 						dropped_attributes_count: 0,
 						name: obj
 							.get("Name")

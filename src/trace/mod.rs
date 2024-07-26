@@ -27,8 +27,7 @@ pub fn trace_id_2_string(trace_id: &[u8]) -> String {
 
 fn spanevent_into_otlp_event(value: &BSpanEvent) -> Event {
 	Event {
-		time_unix_nano: value.ts.timestamp_nanos_opt().unwrap()
-			as u64,
+		time_unix_nano: value.ts.timestamp_nanos_opt().unwrap() as u64,
 		name: value.name.clone(),
 		attributes: hash_into_kv_pairs(value.attributes.clone()),
 		dropped_attributes_count: 0,
@@ -74,8 +73,7 @@ fn spanitem_to_otlp_span(value: &SpanItem) -> Span {
 		flags: 0,
 		name: value.span_name.clone(),
 		kind: SpanKind::try_from(value.span_kind).unwrap().into(),
-		start_time_unix_nano: value.ts.timestamp_nanos_opt().unwrap()
-			as u64,
+		start_time_unix_nano: value.ts.timestamp_nanos_opt().unwrap() as u64,
 		end_time_unix_nano: (value.ts
 			+ Duration::from_nanos(value.duration as u64))
 		.timestamp_nanos_opt()

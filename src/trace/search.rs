@@ -114,10 +114,8 @@ pub async fn search_trace_v2(
 				.map(|v| TempoSpan {
 					span_id: v.span_id.clone(),
 					name: v.span_name.clone(),
-					start_time_unix_nano: v
-						.ts
-						.timestamp_nanos_opt()
-						.unwrap() as u64,
+					start_time_unix_nano: v.ts.timestamp_nanos_opt().unwrap()
+						as u64,
 					duration_nanos: v.duration as u64,
 					attributes: v
 						.span_attributes
@@ -177,18 +175,14 @@ fn get_root_name_map(
 			let w = arr
 				.iter()
 				.max_by(|x, y| {
-					let x_time = x.ts.timestamp_nanos_opt().unwrap()
-						+ x.duration;
-					let y_time = y.ts.timestamp_nanos_opt().unwrap()
-						+ y.duration;
+					let x_time =
+						x.ts.timestamp_nanos_opt().unwrap() + x.duration;
+					let y_time =
+						y.ts.timestamp_nanos_opt().unwrap() + y.duration;
 					x_time.cmp(&y_time)
 				})
 				.unwrap();
-			(
-				k,
-				(w.ts.timestamp_nanos_opt().unwrap() + w.duration)
-					as u64,
-			)
+			(k, (w.ts.timestamp_nanos_opt().unwrap() + w.duration) as u64)
 		})
 		.collect::<HashMap<String, u64>>();
 

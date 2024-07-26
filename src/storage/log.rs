@@ -1,7 +1,7 @@
 use super::QueryLimits;
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::{DateTime, offset::Utc};
+use chrono::{offset::Utc, DateTime};
 use common::LogLevel;
 use dyn_clone::DynClone;
 use logql::parser::{LogQuery, MetricQuery};
