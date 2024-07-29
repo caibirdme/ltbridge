@@ -89,7 +89,7 @@ impl TryFrom<Vec<JSONValue>> for MetricRecord {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = DateTime::parse_from_str(ts, "%s").map_err(|e| {
+		let tts = DateTime::parse_from_str(ts, "%s.%9f").map_err(|e| {
 			dbg!(e);
 			CKConvertErr::Timestamp
 		})?;
