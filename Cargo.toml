@@ -52,7 +52,7 @@ prometheus = "0.13.4"
 prost = { version = "0.13.1" }
 reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 serde = { version = "1.0.204", features = ["derive"] }
-serde_json = { version = "1.0.120" }
+serde_json = { version = "1.0.121" }
 serde_with = { version = "3.9.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
 thiserror = { version = "1.0.63" }
