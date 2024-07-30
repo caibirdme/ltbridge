@@ -218,7 +218,7 @@ impl TryFrom<Vec<JSONValue>> for TraceRecord {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = DateTime::parse_from_str(ts, "%s.%9f")
+		let tts = parse_timestamp_try_best(ts)
 			.map_err(|_| CKConvertErr::Timestamp)?;
 		let record = Self {
 			timestamp: tts

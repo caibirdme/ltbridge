@@ -172,3 +172,14 @@ pub(crate) fn json_array_hashmap(
 		.map(json_object_to_map_s_jsonv)
 		.collect()
 }
+
+static TS_FORMATS: [&str; 4] = ["%s%.9f", "%s", "%s%.6f", "%s%.3f"];
+
+pub(crate) fn parse_timestamp_try_best(ts: &str) -> Result<DateTime<Utc>> {
+	for f in TS_FORMATS.iter() {
+		if let Ok(v) = DateTime::parse_from_str(ts, f) {
+			return Ok(v.to_utc());
+		}
+	}
+	Err(anyhow::anyhow!("Invalid timestamp: {}", ts))
+}
