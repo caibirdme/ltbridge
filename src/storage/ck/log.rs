@@ -89,10 +89,8 @@ impl TryFrom<Vec<JSONValue>> for MetricRecord {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = DateTime::parse_from_str(ts, "%s.%9f").map_err(|e| {
-			dbg!(e);
-			CKConvertErr::Timestamp
-		})?;
+		let tts = parse_timestamp_try_best(ts)
+			.map_err(|_| CKConvertErr::Timestamp)?;
 
 		let record = Self {
 			ts: tts.timestamp_nanos_opt().ok_or(CKConvertErr::Timestamp)?,
@@ -224,9 +222,8 @@ impl TryFrom<Vec<JSONValue>> for LogRecod {
 			return Err(CKConvertErr::Length);
 		}
 		let ts = value[0].as_str().ok_or(CKConvertErr::Timestamp)?;
-		let tts = DateTime::parse_from_str(ts, "%s.%9f")
+		let tts = parse_timestamp_try_best(ts)
 			.map_err(|_| CKConvertErr::Timestamp)?;
-
 		let record = Self {
 			timestamp: tts
 				.timestamp_nanos_opt()
