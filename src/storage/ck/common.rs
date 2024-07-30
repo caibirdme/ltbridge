@@ -173,7 +173,7 @@ pub(crate) fn json_array_hashmap(
 		.collect()
 }
 
-static TS_FORMATS: [&str; 4] = ["%s.%9f", "%s", "%s%.6f", "%s.%3f"];
+static TS_FORMATS: [&str; 4] = ["%s%.9f", "%s", "%s%.6f", "%s%.3f"];
 
 pub(crate) fn parse_timestamp_try_best(ts: &str) -> Result<DateTime<Utc>> {
 	for f in TS_FORMATS.iter() {
