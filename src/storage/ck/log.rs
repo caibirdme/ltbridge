@@ -128,6 +128,25 @@ impl LogStorage for CKLogQuerier {
 }
 
 impl CKLogQuerier {
+	pub async fn init_labels(&self) {
+		let sql = format!(
+			"SELECT {} FROM {} WHERE {} >= now() - INTERVAL 5 MINUTE LIMIT 3000",
+			self.schema.projection().join(","),
+			self.schema.table(),
+			self.schema.ts_key(),
+		);
+		let rows =
+			send_query(self.cli.clone(), self.ck_cfg.common.clone(), sql)
+				.await
+				.unwrap_or_default();
+		let mut records = vec![];
+		for row in rows {
+			if let Ok(record) = LogRecod::try_from(row) {
+				records.push(record.into());
+			}
+		}
+		self.record_label(&records).await;
+	}
 	async fn record_label(&self, records: &[LogItem]) {
 		let cfg = self.ck_cfg.label.clone();
 		for name in Self::collect_svcname(records) {
