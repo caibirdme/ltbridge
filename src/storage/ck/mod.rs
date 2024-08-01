@@ -13,13 +13,11 @@ pub mod trace;
 pub async fn new_log_source(cfg: ClickhouseLog) -> Result<Box<dyn LogStorage>> {
 	let cli = Client::builder()
 		.gzip(true)
-		.timeout(Duration::from_secs(60))
+		.timeout(Duration::from_secs(90))
 		.build()?;
-	Ok(Box::new(log::CKLogQuerier::new(
-		cli,
-		cfg.common.table.clone(),
-		cfg,
-	)))
+	let q = log::CKLogQuerier::new(cli, cfg.common.table.clone(), cfg);
+	q.init_labels().await;
+	Ok(Box::new(q))
 }
 
 pub async fn new_trace_source(
