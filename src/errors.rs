@@ -23,6 +23,10 @@ pub enum AppError {
 	UnsupportedDataType(String),
 	#[error("Storage error: {0}")]
 	StorageError(#[from] anyhow::Error),
+	#[error("series only support one match, but got: {0}")]
+	MultiMatch(usize),
+	#[error("Invalid query string: {0}")]
+	InvalidQueryString(String),
 }
 
 impl IntoResponse for AppError {
@@ -60,6 +64,16 @@ impl IntoResponse for AppError {
 			AppError::DBError(e) => (
 				StatusCode::INTERNAL_SERVER_ERROR,
 				format!("DB error: {}", e),
+			)
+				.into_response(),
+			AppError::MultiMatch(n) => (
+				StatusCode::BAD_REQUEST,
+				format!("series only support one match, but got: {}", n),
+			)
+				.into_response(),
+			AppError::InvalidQueryString(e) => (
+				StatusCode::BAD_REQUEST,
+				format!("Invalid query string: {}", e),
 			)
 				.into_response(),
 		}

@@ -23,37 +23,26 @@ impl LogLevel {
 	}
 }
 
+static LOG_LEVEL_ENUM: [(&str, LogLevel); 6] = [
+	("TRACE", LogLevel::Trace),
+	("DEBUG", LogLevel::Debug),
+	("INFO", LogLevel::Info),
+	("WARN", LogLevel::Warn),
+	("ERROR", LogLevel::Error),
+	("FATAL", LogLevel::Fatal),
+];
+
 impl TryFrom<String> for LogLevel {
 	type Error = anyhow::Error;
 
 	fn try_from(value: String) -> Result<Self> {
-		use LogLevel::*;
 		let u = value.to_uppercase();
-		match u.as_str() {
-			"TRACE" => Ok(Trace),
-			"DEBUG" => Ok(Debug),
-			"INFO" => Ok(Info),
-			"WARN" => Ok(Warn),
-			"ERROR" => Ok(Error),
-			"FATAL" => Ok(Fatal),
-			_ => {
-				if u.starts_with("TRACE") {
-					Ok(Trace)
-				} else if u.starts_with("DEBUG") {
-					Ok(Debug)
-				} else if u.starts_with("INFO") {
-					Ok(Info)
-				} else if u.starts_with("WARN") {
-					Ok(Warn)
-				} else if u.starts_with("ERROR") {
-					Ok(Error)
-				} else if u.starts_with("FATAL") {
-					Ok(Fatal)
-				} else {
-					Err(anyhow!("Invalid log level: {}", value))
-				}
+		for (s, lvl) in LOG_LEVEL_ENUM {
+			if u.starts_with(s) {
+				return Ok(lvl);
 			}
 		}
+		Err(anyhow!("invalid log level: {}", value))
 	}
 }
 

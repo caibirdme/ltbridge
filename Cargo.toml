@@ -33,6 +33,7 @@ bytes = "1.7.0"
 chrono = { workspace = true }
 common = { path = "common" }
 config = { version = "0.14.0" }
+dashmap = "6.0.1"
 databend-driver = { version = "0.19.5" }
 dyn-clone = "1.0.17"
 hex = { version = "0.4.3" }
@@ -51,6 +52,7 @@ ordered-float = { version = "4.2.1" }
 prometheus = "0.13.4"
 prost = { version = "0.13.1" }
 reqwest = { version = "0.12.5", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
+reqwest-middleware = "0.3.2"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.121" }
 serde_with = { version = "3.9.0", features = ["json"] }

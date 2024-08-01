@@ -1,10 +1,11 @@
 use super::*;
 use crate::{errors::AppError, state::AppState};
 use axum::{
-	extract::{Path, Query, State},
+	extract::{rejection::QueryRejection, Path, Query, State},
 	Json,
 };
 use common::TimeRange;
+use logql::parser;
 
 pub async fn query_labels(
 	State(state): State<AppState>,
@@ -62,6 +63,10 @@ fn label_values_cache_key(k: &str) -> String {
 	format!("cc:label_values:{}", k)
 }
 
+fn series_cache_key() -> String {
+	"cc:series".to_string()
+}
+
 pub async fn query_label_values(
 	State(state): State<AppState>,
 	Path(label): Path<String>,
@@ -96,9 +101,49 @@ pub async fn query_label_values(
 	Ok(resp)
 }
 
-pub async fn query_series() -> Json<QuerySeriesResponse> {
-	Json(QuerySeriesResponse {
+pub async fn query_series(
+	State(state): State<AppState>,
+	req: Result<Query<QuerySeriesRequest>, QueryRejection>,
+) -> Result<Json<QuerySeriesResponse>, AppError> {
+	let req = req
+		.map_err(|e| AppError::InvalidQueryString(e.to_string()))?
+		.0;
+	if let Some(cached) = state.cache.get(&series_cache_key()) {
+		return Ok(Json(QuerySeriesResponse {
+			status: ResponseStatus::Success,
+			data: serde_json::from_slice(&cached)?,
+		}));
+	}
+	if req.matches.len() > 1 {
+		return Err(AppError::MultiMatch(req.matches.len()));
+	}
+	let matches = if req.matches.is_empty() {
+		None
+	} else if let parser::Query::LogQuery(ql) =
+		parser::parse_logql_query(req.matches[0].as_str())?
+	{
+		Some(ql)
+	} else {
+		None
+	};
+	let values = state
+		.log_handle
+		.series(
+			matches,
+			QueryLimits {
+				limit: None,
+				range: time_range_less_in_a_day(req.start, req.end),
+				direction: None,
+				step: None,
+			},
+		)
+		.await?;
+	if !values.is_empty() {
+		let d = serde_json::to_vec(&values).unwrap();
+		state.cache.insert(series_cache_key(), d);
+	}
+	Ok(Json(QuerySeriesResponse {
 		status: ResponseStatus::Success,
-		data: vec![],
-	})
+		data: values,
+	}))
 }

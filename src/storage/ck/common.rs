@@ -1,14 +1,27 @@
 use crate::config::Clickhouse;
 use crate::storage::Direction;
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use http::Extensions;
 use itertools::Itertools;
-use reqwest::{header::CONTENT_TYPE, Client};
+use reqwest::{
+	header::{ACCEPT_ENCODING, CONTENT_TYPE},
+	Client,
+};
+use reqwest::{Request, Response};
+use reqwest_middleware::{
+	ClientBuilder, Middleware, Next, Result as ReqResult,
+};
 use serde::Deserialize;
 use serde_json::Value as JSONValue;
-use sqlbuilder::builder::{SortType, TableSchema};
+use sqlbuilder::{
+	builder::{SortType, TableSchema},
+	visit::{ATTRIBUTES_PREFIX, RESOURCES_PREFIX},
+};
 use std::{collections::HashMap, time::Duration};
 use thiserror::Error;
+use tracing::info;
 
 pub fn to_start_interval(step: Duration) -> &'static str {
 	let sec = step.as_secs();
@@ -65,26 +78,31 @@ pub(crate) struct RecordWarpper {
 	pub data: Vec<Vec<JSONValue>>,
 }
 
+static QUERY_PARAMS: [(&str, &str); 7] = [
+	("default_format", "JSONCompact"),
+	("date_time_output_format", "unix_timestamp"), // this is required to handle
+	("add_http_cors_header", "1"),
+	("result_overflow_mode", "break"),
+	("max_result_rows", "1000"),
+	("max_result_bytes", "10000000"),
+	("enable_http_compression", "1"), // enable gzip
+];
+
 pub(crate) async fn send_query(
 	cli: Client,
 	cfg: Clickhouse,
 	sql: String,
 ) -> Result<Vec<Vec<JSONValue>>> {
-	let req = cli
+	let c = ClientBuilder::new(cli).with(LoggingMiddlware).build();
+	let req = c
 		.post(cfg.url.clone())
-		.query(&[
-			("default_format", "JSONCompact"),
-			("date_time_output_format", "unix_timestamp"), // this is required to handle
-			("add_http_cors_header", "1"),
-			("result_overflow_mode", "break"),
-			("max_result_rows", "1000"),
-			("max_result_bytes", "10000000"),
-		])
+		.query(&QUERY_PARAMS)
 		.header(CONTENT_TYPE, "text/plain;charset=UTF-8")
+		.header(ACCEPT_ENCODING, "gzip")
 		.body(sql)
 		.basic_auth(cfg.username.clone(), Some(cfg.password.clone()))
 		.build()?;
-	let res = cli.execute(req).await?.text().await?;
+	let res = c.execute(req).await?.text().await?;
 	let resp: RecordWarpper = serde_json::from_str(&res)?;
 	Ok(resp.data)
 }
@@ -182,4 +200,62 @@ pub(crate) fn parse_timestamp_try_best(ts: &str) -> Result<DateTime<Utc>> {
 		}
 	}
 	Err(anyhow::anyhow!("Invalid timestamp: {}", ts))
+}
+
+struct LoggingMiddlware;
+
+#[async_trait]
+impl Middleware for LoggingMiddlware {
+	async fn handle(
+		&self,
+		req: Request,
+		extensions: &mut Extensions,
+		next: Next<'_>,
+	) -> ReqResult<Response> {
+		if let Some(v) = req.body().and_then(|b| b.as_bytes()) {
+			info!("exec sql in ck: {:?}", std::str::from_utf8(v).unwrap());
+		};
+		next.run(req, extensions).await
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum LabelType {
+	Raw(String),
+	ServiceName,
+	Level,
+	ResourceAttr(String),
+	LogAttr(String),
+	TraceId,
+}
+
+impl From<LabelType> for String {
+	fn from(l: LabelType) -> Self {
+		match l {
+			LabelType::Raw(s) => s,
+			LabelType::ServiceName => "ServiceName".to_string(),
+			LabelType::Level => "level".to_string(),
+			LabelType::ResourceAttr(s) => format!("{}{}", RESOURCES_PREFIX, s),
+			LabelType::LogAttr(s) => format!("{}{}", ATTRIBUTES_PREFIX, s),
+			LabelType::TraceId => "trace_id".to_string(),
+		}
+	}
+}
+
+impl From<&str> for LabelType {
+	fn from(s: &str) -> Self {
+		if s.starts_with("resource_") {
+			LabelType::ResourceAttr(s.to_string())
+		} else if s.starts_with("log_") {
+			LabelType::LogAttr(s.to_string())
+		} else if s.to_uppercase().eq("SERVICENAME") {
+			LabelType::ServiceName
+		} else if s.to_uppercase().eq("SEVERITYTEXT")
+			|| s.to_uppercase().eq("LEVEL")
+		{
+			LabelType::Level
+		} else {
+			LabelType::Raw(s.to_string())
+		}
+	}
 }

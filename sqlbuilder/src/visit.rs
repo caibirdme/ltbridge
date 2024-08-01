@@ -4,8 +4,8 @@ use super::builder::{
 use common::LogLevel;
 use logql::parser::*;
 
-const RESOURCES_PREFIX: &str = "resources_";
-const ATTRIBUTES_PREFIX: &str = "attributes_";
+pub const RESOURCES_PREFIX: &str = "resources_";
+pub const ATTRIBUTES_PREFIX: &str = "attributes_";
 
 pub trait IRVisitor {
 	fn label_pair(&self, label: &LabelPair) -> Condition;
@@ -59,6 +59,12 @@ impl IRVisitor for DefaultIRVisitor {
 			return Condition {
 				column: Column::Level,
 				cmp: Cmp::Equal(PlaceValue::Integer(u as i64)),
+			};
+		}
+		if matches!(p.label.to_lowercase().as_str(), "trace_id" | "traceid") {
+			return Condition {
+				column: Column::TraceID,
+				cmp: Cmp::Equal(PlaceValue::String(p.value.to_string())),
 			};
 		}
 		Condition {

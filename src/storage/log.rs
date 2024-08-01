@@ -29,6 +29,13 @@ pub trait LogStorage: DynClone + Send + Sync {
 	) -> Result<Vec<String>> {
 		Ok(vec![])
 	}
+	async fn series(
+		&self,
+		_match: Option<LogQuery>,
+		_opt: QueryLimits,
+	) -> Result<Vec<HashMap<String, String>>> {
+		Ok(vec![])
+	}
 }
 
 dyn_clone::clone_trait_object!(LogStorage);
