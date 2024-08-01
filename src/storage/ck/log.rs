@@ -407,7 +407,7 @@ impl TableSchema for LogTable {
 		"TraceId"
 	}
 	fn attributes_key(&self) -> &str {
-		"SpanAttributes"
+		"LogAttributes"
 	}
 	fn resources_key(&self) -> &str {
 		"ResourceAttributes"
