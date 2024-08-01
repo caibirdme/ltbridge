@@ -244,18 +244,29 @@ server:
     filter_directives: info,tower_http=off,databend_client=off
 log_source:
   clickhouse:
-    url: http://127.0.0.1:8123
-    database: default
-    table: otel_logs
-    username: default
-    password: a11221122a
+    log:
+      url: http://127.0.0.1:8123
+      database: default
+      table: otel_logs
+      username: default
+      password: a11221122a
+      label:
+        # specify labels to support grafana auto completion
+        # must be low cardinality
+        # if you don't know how to set, just set them to []
+        # resource for this column: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/exporter_logs.go#L147
+        resources: ["host.arch", "telemetry.sdk.version", "process.runtime.name"]
+        # attributes(LogAttributes): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/exporter_logs.go#L152
+        attributes: ["quantity", "code.function"]
 trace_source:
   clickhouse:
-    url: http://127.0.0.1:8123
-    database: default
-    table: otel_traces
-    username: default
-    password: a11221122a
+    trace:
+      url: http://127.0.0.1:8123
+      database: default
+      table: otel_traces
+      username: default
+      password: a11221122a
+      trace_ts_table: otel_traces_trace_id_ts
 ```
 
 **Note:** Since there's no available rust clickhouse sdk that supports both nested type and map type, ltbridge has no choice but to use http + jsoneachrow, so 8123 is required.
