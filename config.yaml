@@ -9,11 +9,16 @@ server:
     filter_directives: info,tower_http=off,databend_client=off
 log_source:
   clickhouse:
-    url: http://127.0.0.1:8123
-    database: default
-    table: otel_logs
-    username: default
-    password: a11221122a
+    log:
+      url: http://127.0.0.1:8123
+      database: default
+      table: otel_logs
+      username: default
+      password: a11221122a
+      label:
+        resources: ["host.arch", "telemetry.sdk.version", "process.runtime.name"]
+        attributes: ["quantity", "code.function"]
+
   # quickwit:
   #   domain: http://127.0.0.1:7280
   #   index: otel-logs-v0_7
@@ -29,12 +34,13 @@ log_source:
   #   inverted_index: true
 trace_source:
   clickhouse:
-    url: http://127.0.0.1:8123
-    database: default
-    table: otel_traces
-    username: default
-    password: a11221122a
-    trace_ts_table: otel_traces_trace_id_ts
+    trace:
+      url: http://127.0.0.1:8123
+      database: default
+      table: otel_traces
+      username: default
+      password: a11221122a
+      trace_ts_table: otel_traces_trace_id_ts
   # quickwit:
   #   domain: http://127.0.0.1:7280
   #   index: otel-traces-v0_7

@@ -3,6 +3,7 @@ use ltbridge::storage::{new_log_source, new_trace_source};
 use ltbridge::{config::AppConfig, metrics, routes, state};
 use moka::sync::Cache;
 use std::{fs::OpenOptions, sync::Arc, time::Duration};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -33,8 +34,8 @@ async fn main() -> Result<()> {
 	// init cache
 	let cache = Cache::builder()
 		.max_capacity(1000)
-		.time_to_live(Duration::from_secs(20 * 60))
-		.time_to_idle(Duration::from_secs(3 * 60))
+		.time_to_live(Duration::from_secs(2 * 60))
+		.time_to_idle(Duration::from_secs(2 * 60))
 		.build();
 
 	let trace_handle = new_trace_source(cfg.trace_source.clone()).await?;
@@ -49,9 +50,11 @@ async fn main() -> Result<()> {
 		metrics: Arc::new(metrics_handle),
 	});
 	// run our app with hyper, listening globally on port 3000
-	let listener = tokio::net::TcpListener::bind(cfg.server.listen_addr)
-		.await
-		.unwrap();
+	let listener =
+		tokio::net::TcpListener::bind(cfg.server.listen_addr.clone())
+			.await
+			.unwrap();
+	info!("Listening on: {}", cfg.server.listen_addr);
 	axum::serve(listener, app).await.unwrap();
 	Ok(())
 }

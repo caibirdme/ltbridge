@@ -1,22 +1,23 @@
 use super::{log::LogStorage, trace::TraceStorage};
-use crate::config::{Clickhouse, ClickhouseTrace};
+use crate::config::{ClickhouseLog, ClickhouseTrace};
 use anyhow::Result;
 use reqwest::Client;
 use std::time::Duration;
 
 pub(crate) mod common;
 pub(crate) mod converter;
+pub(crate) mod labels;
 pub mod log;
 pub mod trace;
 
-pub async fn new_log_source(cfg: Clickhouse) -> Result<Box<dyn LogStorage>> {
+pub async fn new_log_source(cfg: ClickhouseLog) -> Result<Box<dyn LogStorage>> {
 	let cli = Client::builder()
 		.gzip(true)
 		.timeout(Duration::from_secs(60))
 		.build()?;
 	Ok(Box::new(log::CKLogQuerier::new(
 		cli,
-		cfg.table.clone(),
+		cfg.common.table.clone(),
 		cfg,
 	)))
 }

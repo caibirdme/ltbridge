@@ -71,10 +71,30 @@ pub struct ClickhouseTrace {
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
-#[serde(untagged)]
+pub struct CKLogLabel {
+	#[serde(rename = "resources", default = "empty_vec")]
+	pub resource_attributes: Vec<String>,
+	#[serde(rename = "attributes", default = "empty_vec")]
+	pub log_attributes: Vec<String>,
+}
+
+fn empty_vec() -> Vec<String> {
+	vec![]
+}
+
+#[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
+pub struct ClickhouseLog {
+	#[serde(flatten)]
+	pub common: Clickhouse,
+	pub label: CKLogLabel,
+}
+
+#[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
 pub enum ClickhouseConf {
+	#[serde(rename = "trace")]
 	Trace(ClickhouseTrace),
-	Log(Clickhouse),
+	#[serde(rename = "log")]
+	Log(ClickhouseLog),
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
@@ -171,6 +191,39 @@ mod tests {
 	}
 
 	#[test]
+	fn test_deser_cklog() {
+		let j = r#"
+		{
+			"log": {
+				"url": "http://127.0.0.1:8123",
+				"database": "default",
+				"table": "otel_logs",
+				"username": "default",
+				"password": "a11221122a",
+				"label": {
+					"resources": ["a"],
+					"attributes": ["b"]
+				}
+			}
+		}"#;
+		let actual = serde_json::from_str::<ClickhouseConf>(j).unwrap();
+		let expect = ClickhouseConf::Log(ClickhouseLog {
+			common: Clickhouse {
+				url: "http://127.0.0.1:8123".to_string(),
+				database: "default".to_string(),
+				table: "otel_logs".to_string(),
+				username: "default".to_string(),
+				password: "a11221122a".to_string(),
+			},
+			label: CKLogLabel {
+				resource_attributes: vec!["a".to_string()],
+				log_attributes: vec!["b".to_string()],
+			},
+		});
+		assert_eq!(expect, actual);
+	}
+
+	#[test]
 	fn test_databend_enum() {
 		let j = r#"
 		{
@@ -198,5 +251,38 @@ mod tests {
 			inverted_index: true,
 		});
 		assert_eq!(cfg, expect);
+	}
+
+	#[test]
+	fn test_decode_whole_file() -> anyhow::Result<()> {
+		let cfg: AppConfig = Config::builder()
+			.add_source(File::with_name("./config.yaml"))
+			.build()?
+			.try_deserialize()?;
+		let exp = ClickhouseLog {
+			common: Clickhouse {
+				url: "http://127.0.0.1:8123".to_string(),
+				database: "default".to_string(),
+				table: "otel_logs".to_string(),
+				username: "default".to_string(),
+				password: "a11221122a".to_string(),
+			},
+			label: CKLogLabel {
+				resource_attributes: vec![
+					"host.arch".to_string(),
+					"telemetry.sdk.version".to_string(),
+					"process.runtime.name".to_string(),
+				],
+				log_attributes: vec![
+					"quantity".to_string(),
+					"code.function".to_string(),
+				],
+			},
+		};
+		assert_eq!(
+			cfg.log_source,
+			DataSource::Clickhouse(ClickhouseConf::Log(exp))
+		);
+		Ok(())
 	}
 }
