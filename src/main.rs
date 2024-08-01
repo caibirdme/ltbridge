@@ -11,23 +11,10 @@ async fn main() -> Result<()> {
 	// load configuration
 	let cfg = AppConfig::new().unwrap();
 
-	let log_file = OpenOptions::new()
-		.append(true)
-		.create(true)
-		.open(&cfg.server.log.file)
-		.unwrap();
-	// initialize
-	// tracing
-	tracing_subscriber::registry()
-		.with(tracing_subscriber::EnvFilter::new(
-			&cfg.server.log.filter_directives,
-		))
-		.with(
-			tracing_subscriber::fmt::layer()
-				.json()
-				.with_writer(log_file),
-		)
-		.init();
+	init_tracing_subscriber(
+		cfg.server.log.file.clone(),
+		cfg.server.log.filter_directives.as_str(),
+	);
 
 	// init metrics
 	let metrics_handle = metrics::setup_metrcis();
@@ -57,4 +44,31 @@ async fn main() -> Result<()> {
 	info!("Listening on: {}", cfg.server.listen_addr);
 	axum::serve(listener, app).await.unwrap();
 	Ok(())
+}
+
+fn init_tracing_subscriber(file: String, filter_directives: &str) {
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::new(filter_directives))
+		.with(
+			tracing_subscriber::fmt::layer()
+				.json()
+				.with_writer(move || get_writer(file.clone())),
+		)
+		.init();
+}
+
+fn get_writer(file: String) -> Box<dyn std::io::Write> {
+	if file.as_str() == "stdout" {
+		Box::new(std::io::stdout())
+	} else if file.as_str() == "stderr" {
+		Box::new(std::io::stderr())
+	} else {
+		Box::new(
+			OpenOptions::new()
+				.append(true)
+				.create(true)
+				.open(file)
+				.unwrap(),
+		)
+	}
 }

@@ -3,7 +3,7 @@ server:
   timeout: 30s
   log:
     level: info
-    file: info.log
+    file: stdout
     # for more details about filter_directives
     # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
     filter_directives: info,tower_http=off,databend_client=off
