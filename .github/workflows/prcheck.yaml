@@ -23,6 +23,8 @@ jobs:
         curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
         unzip protoc-25.1-linux-x86_64.zip -d foo
         sudo mv foo/bin/protoc /usr/local/bin/protoc
+    - name: rust cache
+      uses: Swatinem/rust-cache@v2
     - name: Install binstall
       run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
     - name: Install checkers
