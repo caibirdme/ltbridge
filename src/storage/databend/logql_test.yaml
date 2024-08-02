@@ -24,9 +24,9 @@ with_filters_use_inverted_index:
 search_level:
   input: '{level="info"}'
   expect: |
-    SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE level=9
+    SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE level='info'
 search_empty_filter:
   input: '{level="info"} |= "" |= "hello"'
   expect: |
     SELECT app, server, trace_id, span_id, level, tags, message, timestamp FROM logs WHERE 
-      (level=9 AND message LIKE '%hello%')
+      (level='info' AND message LIKE '%hello%')

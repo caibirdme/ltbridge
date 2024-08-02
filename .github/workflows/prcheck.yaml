@@ -38,11 +38,8 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: clippy
-        args: --target x86_64-unknown-linux-musl -- -D warnings
-        use-cross: true
+        args: -- -D warnings
     - name: Unit Test
       uses: actions-rs/cargo@v1
       with:
         command: test
-        use-cross: true
-        args: --target x86_64-unknown-linux-musl
