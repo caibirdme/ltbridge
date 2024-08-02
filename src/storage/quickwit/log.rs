@@ -250,7 +250,7 @@ fn record_to_logitem(r: LogRecord) -> LogItem {
 		ts: DateTime::from_timestamp_nanos(r.timestamp_nanos as i64),
 		trace_id: r.trace_id.unwrap_or("".to_string()),
 		span_id: r.span_id.unwrap_or("".to_string()),
-		level,
+		level: level.into(),
 		service_name: r.service_name,
 		resource_attributes: jsonmap_to_stringmap(r.resource_attributes),
 		log_attributes: jsonmap_to_stringmap(r.attributes),

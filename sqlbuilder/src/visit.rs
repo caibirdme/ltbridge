@@ -1,7 +1,6 @@
 use super::builder::{
 	conditions_into_selection, Cmp, Column, Condition, PlaceValue, Selection,
 };
-use common::LogLevel;
 use logql::parser::*;
 
 pub const RESOURCES_PREFIX: &str = "resources_";
@@ -52,15 +51,6 @@ pub struct DefaultIRVisitor;
 
 impl IRVisitor for DefaultIRVisitor {
 	fn label_pair(&self, p: &LabelPair) -> Condition {
-		if p.label == "level" {
-			let u: u32 = LogLevel::try_from(p.value.to_string())
-				.unwrap_or(LogLevel::Info)
-				.into();
-			return Condition {
-				column: Column::Level,
-				cmp: Cmp::Equal(PlaceValue::Integer(u as i64)),
-			};
-		}
 		if matches!(p.label.to_lowercase().as_str(), "trace_id" | "traceid") {
 			return Condition {
 				column: Column::TraceID,

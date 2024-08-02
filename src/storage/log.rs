@@ -45,7 +45,7 @@ pub struct LogItem {
 	pub ts: DateTime<Utc>,
 	pub trace_id: String,
 	pub span_id: String,
-	pub level: LogLevel,
+	pub level: String,
 	pub service_name: String,
 	pub message: String,
 	pub resource_attributes: HashMap<String, String>,

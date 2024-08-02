@@ -3,6 +3,7 @@ use crate::storage::{log::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
+use common::LogLevel;
 use databend_driver::{Connection, Row, TryFromRow};
 use logql::parser::{LogQuery, MetricQuery};
 use sqlbuilder::builder::*;
@@ -125,7 +126,7 @@ fn row_into_logitem(row: Row) -> Result<LogItem> {
 		ts: row.ts.and_utc(),
 		trace_id: row.trace_id,
 		span_id: row.span_id,
-		level: row.level.into(),
+		level: LogLevel::from(row.level).into(),
 		service_name: row.service_name,
 		message: row.message,
 		resource_attributes: row.resource_attributes,

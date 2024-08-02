@@ -17,6 +17,12 @@ jobs:
         toolchain: 1.80.0
         profile: minimal
         override: true
+    - name: Install protoc
+      run: |
+        PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+        curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
+        unzip protoc-25.1-linux-x86_64.zip -d foo
+        sudo mv foo/bin/protoc /usr/local/bin/protoc
     - name: Install binstall
       run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
     - name: Install checkers
@@ -38,11 +44,8 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: clippy
-        args: --target x86_64-unknown-linux-musl -- -D warnings
-        use-cross: true
+        args: -- -D warnings
     - name: Unit Test
       uses: actions-rs/cargo@v1
       with:
         command: test
-        use-cross: true
-        args: --target x86_64-unknown-linux-musl

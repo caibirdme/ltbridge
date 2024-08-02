@@ -153,7 +153,7 @@ impl CKLogQuerier {
 			let _ = self.tx.send((LabelType::ServiceName, name.clone())).await;
 		}
 		for level in Self::collect_level(records) {
-			let _ = self.tx.send((LabelType::Level, level.into())).await;
+			let _ = self.tx.send((LabelType::Level, level)).await;
 		}
 		if !cfg.resource_attributes.is_empty() {
 			for (k, vs) in Self::collect_attrs(
@@ -191,8 +191,9 @@ impl CKLogQuerier {
 			records.iter().map(|r| r.service_name.clone()).collect();
 		set.into_iter().collect()
 	}
-	fn collect_level(records: &[LogItem]) -> Vec<LogLevel> {
-		let set: HashSet<LogLevel> = records.iter().map(|r| r.level).collect();
+	fn collect_level(records: &[LogItem]) -> Vec<String> {
+		let set: HashSet<String> =
+			records.iter().map(|r| r.level.clone()).collect();
 		set.into_iter().collect()
 	}
 	fn collect_attrs(
@@ -349,7 +350,6 @@ struct LogRecod {
 	trace_id: String,
 	span_id: String,
 	severity_text: String,
-	serverity_number: u32,
 	service_name: String,
 	body: String,
 	resource_attr: HashMap<String, String>,
@@ -376,7 +376,6 @@ impl TryFrom<Vec<JSONValue>> for LogRecod {
 			trace_id: value[1].as_str().unwrap_or("").to_string(),
 			span_id: value[2].as_str().unwrap_or("").to_string(),
 			severity_text: value[3].as_str().unwrap_or("").to_string(),
-			serverity_number: value[4].as_u64().unwrap_or(0) as u32,
 			service_name: value[5].as_str().unwrap_or("").to_string(),
 			body: value[6].as_str().unwrap_or("").to_string(),
 			resource_attr: json_object_to_map_s_s(&value[7])?,
@@ -394,11 +393,7 @@ impl From<LogRecod> for LogItem {
 			ts: DateTime::from_timestamp_nanos(r.timestamp),
 			trace_id: r.trace_id,
 			span_id: r.span_id,
-			level: if r.severity_text.is_empty() {
-				r.serverity_number.into()
-			} else {
-				LogLevel::try_from(r.severity_text).unwrap_or(LogLevel::Info)
-			},
+			level: r.severity_text,
 			service_name: r.service_name,
 			message: r.body,
 			resource_attributes: r.resource_attr,
