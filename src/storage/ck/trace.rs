@@ -95,7 +95,7 @@ AND Timestamp <= end
 		schema.projection().join(","),
 		schema.full_table(),
 	);
-	sql
+	sql.replace("\n", " ").replace("\t", " ")
 }
 
 #[derive(Clone)]
