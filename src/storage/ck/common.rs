@@ -215,7 +215,10 @@ impl Middleware for LoggingMiddlware {
 		if let Some(v) = req.body().and_then(|b| b.as_bytes()) {
 			info!("exec sql in ck: {:?}", std::str::from_utf8(v).unwrap());
 		};
-		next.run(req, extensions).await
+		let start = std::time::Instant::now();
+		let res = next.run(req, extensions).await;
+		info!("sql exec cost: {:?}", start.elapsed());
+		res
 	}
 }
 
