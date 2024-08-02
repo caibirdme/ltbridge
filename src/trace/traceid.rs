@@ -84,6 +84,11 @@ pub async fn get_trace_by_id(
 		.into_iter()
 		.map(|span| spanitem_into_resourcespans(&span))
 		.collect_vec();
+	// when not found, tempo returns 404
+	// https://github.com/grafana/tempo/blob/main/modules/querier/http.go#L75
+	if spans.is_empty() {
+		return Err(AppError::TraceNotFound);
+	}
 	let resp = Trace {
 		batches: reorder_spans(spans),
 	};

@@ -21,7 +21,7 @@ use sqlbuilder::{
 };
 use std::{collections::HashMap, time::Duration};
 use thiserror::Error;
-use tracing::info;
+use tracing::{error, info};
 
 pub fn to_start_interval(step: Duration) -> &'static str {
 	let sec = step.as_secs();
@@ -102,8 +102,23 @@ pub(crate) async fn send_query(
 		.body(sql)
 		.basic_auth(cfg.username.clone(), Some(cfg.password.clone()))
 		.build()?;
-	let res = c.execute(req).await?.text().await?;
-	let resp: RecordWarpper = serde_json::from_str(&res)?;
+	let res = c
+		.execute(req)
+		.await
+		.map_err(|e| {
+			error!("fail to send ck request: {}", e);
+			e
+		})?
+		.text()
+		.await
+		.map_err(|e| {
+			error!("fail to read ck response: {}", e);
+			e
+		})?;
+	let resp: RecordWarpper = serde_json::from_str(&res).map_err(|e| {
+		error!("fail to parse ck response: {}", res);
+		e
+	})?;
 	Ok(resp.data)
 }
 

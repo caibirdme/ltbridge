@@ -27,6 +27,8 @@ pub enum AppError {
 	MultiMatch(usize),
 	#[error("Invalid query string: {0}")]
 	InvalidQueryString(String),
+	#[error("Trace not found")]
+	TraceNotFound,
 }
 
 impl IntoResponse for AppError {
@@ -76,6 +78,10 @@ impl IntoResponse for AppError {
 				format!("Invalid query string: {}", e),
 			)
 				.into_response(),
+			AppError::TraceNotFound => {
+				(StatusCode::NOT_FOUND, "Trace not found".to_string())
+					.into_response()
+			}
 		}
 	}
 }
