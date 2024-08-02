@@ -133,10 +133,10 @@ fn to_log_query_range_response(
 		.iter()
 		.map(|r| {
 			let mut tags = HashMap::from_iter(vec![
-				("service_name".to_string(), r.service_name.clone()),
-				("trace_id".to_string(), r.trace_id.clone()),
-				("span_id".to_string(), r.span_id.clone()),
-				("level".to_string(), r.level.into()),
+				("ServiceName".to_string(), r.service_name.clone()),
+				("TraceId".to_string(), r.trace_id.clone()),
+				("SpanId".to_string(), r.span_id.clone()),
+				("SeverityText".to_string(), r.level.clone()),
 			]);
 			if !r.scope_name.is_empty() {
 				tags.insert("scope_name".to_string(), r.scope_name.clone());

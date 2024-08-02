@@ -237,7 +237,7 @@ impl From<LabelType> for String {
 		match l {
 			LabelType::Raw(s) => s,
 			LabelType::ServiceName => "ServiceName".to_string(),
-			LabelType::Level => "level".to_string(),
+			LabelType::Level => "SeverityText".to_string(),
 			LabelType::ResourceAttr(s) => format!("{}{}", RESOURCES_PREFIX, s),
 			LabelType::LogAttr(s) => format!("{}{}", ATTRIBUTES_PREFIX, s),
 			LabelType::TraceId => "trace_id".to_string(),
@@ -253,9 +253,7 @@ impl From<&str> for LabelType {
 			LabelType::LogAttr(s.to_string())
 		} else if s.to_uppercase().eq("SERVICENAME") {
 			LabelType::ServiceName
-		} else if s.to_uppercase().eq("SEVERITYTEXT")
-			|| s.to_uppercase().eq("LEVEL")
-		{
+		} else if s.to_uppercase().eq("SEVERITYTEXT") {
 			LabelType::Level
 		} else {
 			LabelType::Raw(s.to_string())
