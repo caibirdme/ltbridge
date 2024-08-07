@@ -258,6 +258,9 @@ log_source:
         resources: ["host.arch", "telemetry.sdk.version", "process.runtime.name"]
         # attributes(LogAttributes): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/exporter_logs.go#L152
         attributes: ["quantity", "code.function"]
+      # convert {attributes_foo_bar_baz} => LogAttributes['foo.bar.baz']
+      # only support attributes_xxx and resources_xxx
+      replace_dash_to_dot: true
 trace_source:
   clickhouse:
     trace:

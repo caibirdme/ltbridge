@@ -50,7 +50,12 @@ impl LogStorage for CKLogQuerier {
 		q: &LogQuery,
 		opt: QueryLimits,
 	) -> Result<Vec<LogItem>> {
-		let sql = logql_to_sql(q, opt, &self.schema);
+		let sql = logql_to_sql(
+			q,
+			opt,
+			&self.schema,
+			self.ck_cfg.replace_dash_to_dot.unwrap_or(false),
+		);
 		let mut results = vec![];
 		let rows =
 			send_query(self.cli.clone(), self.ck_cfg.common.clone(), sql)
@@ -267,7 +272,7 @@ fn new_from_metricquery(
 	let selection = v.visit(&q.log_query);
 	let step = limits.step.unwrap_or(DEFAULT_STEP);
 	let qp = QueryPlan::new(
-		CKLogConverter::new(schema.clone()),
+		CKLogConverter::new(schema.clone(), false),
 		schema.clone(),
 		vec![
 			to_start_interval(step).to_string(),
@@ -287,11 +292,12 @@ fn logql_to_sql(
 	q: &LogQuery,
 	limits: QueryLimits,
 	schema: &LogTable,
+	replace_dash: bool,
 ) -> String {
 	let v = LogQLVisitor::new(DefaultIRVisitor {});
 	let selection = v.visit(q);
 	let qp = QueryPlan::new(
-		CKLogConverter::new(schema.clone()),
+		CKLogConverter::new(schema.clone(), replace_dash),
 		schema.clone(),
 		schema.projection(),
 		selection,

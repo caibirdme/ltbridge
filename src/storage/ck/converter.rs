@@ -4,17 +4,21 @@ use sqlbuilder::builder::*;
 
 pub struct CKLogConverter<T: TableSchema> {
 	table: T,
+	replace_dash_to_dot: bool,
 }
 
 impl<T: TableSchema> CKLogConverter<T> {
-	pub fn new(table: T) -> Self {
-		Self { table }
+	pub fn new(table: T, replace_dash_to_dot: bool) -> Self {
+		Self {
+			table,
+			replace_dash_to_dot,
+		}
 	}
 }
 
 impl<T: TableSchema> QueryConverter for CKLogConverter<T> {
 	fn convert_condition(&self, c: &Condition) -> String {
-		let col_name = column_name(&self.table, &c.column);
+		let col_name = self.column_name(&c.column);
 		match &c.cmp {
 			Cmp::Equal(v) => format!("{} = {}", col_name, v),
 			Cmp::NotEqual(v) => format!("{} != {}", col_name, v),
@@ -56,14 +60,36 @@ impl<T: TableSchema> QueryConverter for CKLogConverter<T> {
 	}
 }
 
-fn column_name(obj: &impl TableSchema, c: &Column) -> String {
-	match c {
-		Column::Message => obj.msg_key().to_string(),
-		Column::Timestamp => obj.ts_key().to_string(),
-		Column::Level => obj.level_key().to_string(),
-		Column::TraceID => obj.trace_key().to_string(),
-		Column::Resources(s) => format!("{}['{}']", obj.resources_key(), s),
-		Column::Attributes(s) => format!("{}['{}']", obj.attributes_key(), s),
-		Column::Raw(s) => s.clone(),
+impl<T: TableSchema> CKLogConverter<T> {
+	fn column_name(&self, c: &Column) -> String {
+		match c {
+			Column::Message => self.table.msg_key().to_string(),
+			Column::Timestamp => self.table.ts_key().to_string(),
+			Column::Level => self.table.level_key().to_string(),
+			Column::TraceID => self.table.trace_key().to_string(),
+			Column::Resources(s) => {
+				if self.replace_dash_to_dot {
+					format!(
+						"{}['{}']",
+						self.table.resources_key(),
+						s.replace("_", ".")
+					)
+				} else {
+					format!("{}['{}']", self.table.resources_key(), s)
+				}
+			}
+			Column::Attributes(s) => {
+				if self.replace_dash_to_dot {
+					format!("{}['{}']", self.table.attributes_key(), s)
+				} else {
+					format!(
+						"{}['{}']",
+						self.table.attributes_key(),
+						s.replace("_", ".")
+					)
+				}
+			}
+			Column::Raw(s) => s.clone(),
+		}
 	}
 }
