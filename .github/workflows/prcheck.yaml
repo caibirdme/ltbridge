@@ -28,26 +28,12 @@ jobs:
     - name: Install binstall
       run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
     - name: Install checkers
-      uses: actions-rs/cargo@v1
-      with:
-        command: binstall
-        args: -y cargo-sort
+      run: cargo binstall -y cargo-sort
     - name: cargo sort check
-      uses: actions-rs/cargo@v1
-      with:
-        command: sort
-        args: -c
+      run: cargo sort -c
     - name: Fmt check
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: -- --check
+      run: cargo fmt -- --check
     - name: Clippy check
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: -- -D warnings
+      run: cargo clippy -- -D warnings
     - name: Unit Test
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
+      run: cargo test
