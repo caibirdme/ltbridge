@@ -87,6 +87,7 @@ pub struct ClickhouseLog {
 	#[serde(flatten)]
 	pub common: Clickhouse,
 	pub label: CKLogLabel,
+	pub replace_dash_to_dot: Option<bool>,
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
@@ -219,6 +220,7 @@ mod tests {
 				resource_attributes: vec!["a".to_string()],
 				log_attributes: vec!["b".to_string()],
 			},
+			replace_dash_to_dot: None,
 		});
 		assert_eq!(expect, actual);
 	}
@@ -278,6 +280,7 @@ mod tests {
 					"code.function".to_string(),
 				],
 			},
+			replace_dash_to_dot: Some(true),
 		};
 		assert_eq!(
 			cfg.log_source,

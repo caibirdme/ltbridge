@@ -148,15 +148,24 @@ fn to_log_query_range_response(
 			if !r.scope_name.is_empty() {
 				tags.insert("scope_name".to_string(), r.scope_name.clone());
 			}
-			r.resource_attributes.iter().for_each(|(k, v)| {
-				tags.insert(format!("resources.{}", k), v.clone());
-			});
-			r.scope_attributes.iter().for_each(|(k, v)| {
-				tags.insert(format!("scopes.{}", k), v.clone());
-			});
-			r.log_attributes.iter().for_each(|(k, v)| {
-				tags.insert(format!("attributes.{}", k), v.clone());
-			});
+			r.resource_attributes
+				.iter()
+				.filter(|(_, v)| !v.is_empty())
+				.for_each(|(k, v)| {
+					tags.insert(format!("resources_{}", k), v.clone());
+				});
+			r.scope_attributes
+				.iter()
+				.filter(|(_, v)| !v.is_empty())
+				.for_each(|(k, v)| {
+					tags.insert(format!("scopes_{}", k), v.clone());
+				});
+			r.log_attributes
+				.iter()
+				.filter(|(_, v)| !v.is_empty())
+				.for_each(|(k, v)| {
+					tags.insert(format!("attributes_{}", k), v.clone());
+				});
 			tag_list.push(tags.clone());
 			Some(StreamValue {
 				stream: tags,
