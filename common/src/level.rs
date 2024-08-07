@@ -46,6 +46,14 @@ impl TryFrom<String> for LogLevel {
 	}
 }
 
+impl TryFrom<&str> for LogLevel {
+	type Error = anyhow::Error;
+
+	fn try_from(value: &str) -> Result<Self> {
+		value.to_string().try_into()
+	}
+}
+
 impl From<u32> for LogLevel {
 	fn from(l: u32) -> Self {
 		use LogLevel::*;

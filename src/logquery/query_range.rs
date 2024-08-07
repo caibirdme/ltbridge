@@ -6,7 +6,6 @@ use crate::{
 };
 use axum::extract::{Query, State};
 use axum_valid::Valid;
-use common::LogLevel;
 use itertools::Itertools;
 use logql::parser;
 use moka::sync::Cache;
@@ -132,18 +131,14 @@ fn to_log_query_range_response(
 	let mut tag_list = vec![];
 	let streams = value
 		.iter()
-		.filter_map(|r| {
-			let lvl = LogLevel::try_from(r.level.clone());
-			if lvl.is_err() {
-				return None;
-			}
+		.map(|r| {
 			let mut tags = HashMap::from_iter(vec![
 				("ServiceName".to_string(), r.service_name.clone()),
 				("TraceId".to_string(), r.trace_id.clone()),
 				("SpanId".to_string(), r.span_id.clone()),
 				("SeverityText".to_string(), r.level.clone()),
 				// fix: https://github.com/grafana/loki/pull/12651
-				("level".to_string(), lvl.unwrap().into()),
+				("level".to_string(), r.level.clone()),
 			]);
 			if !r.scope_name.is_empty() {
 				tags.insert("scope_name".to_string(), r.scope_name.clone());
@@ -167,13 +162,13 @@ fn to_log_query_range_response(
 					tags.insert(format!("attributes_{}", k), v.clone());
 				});
 			tag_list.push(tags.clone());
-			Some(StreamValue {
+			StreamValue {
 				stream: tags,
 				values: vec![[
 					r.ts.timestamp_nanos_opt().unwrap().to_string(),
 					r.message.clone(),
 				]],
-			})
+			}
 		})
 		.collect();
 	(

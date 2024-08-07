@@ -19,6 +19,7 @@ log_source:
         resources: ["host.arch", "telemetry.sdk.version", "process.runtime.name"]
         attributes: ["quantity", "code.function"]
       replace_dash_to_dot: true
+      default_log_level: debug
 
   # quickwit:
   #   domain: http://127.0.0.1:7280
