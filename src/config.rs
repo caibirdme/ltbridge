@@ -88,6 +88,12 @@ pub struct ClickhouseLog {
 	pub common: Clickhouse,
 	pub label: CKLogLabel,
 	pub replace_dash_to_dot: Option<bool>,
+	#[serde(default = "default_log_level")]
+	pub default_log_level: String,
+}
+
+fn default_log_level() -> String {
+	"info".to_string()
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
@@ -221,6 +227,7 @@ mod tests {
 				log_attributes: vec!["b".to_string()],
 			},
 			replace_dash_to_dot: None,
+			default_log_level: "info".to_string(),
 		});
 		assert_eq!(expect, actual);
 	}
@@ -281,6 +288,7 @@ mod tests {
 				],
 			},
 			replace_dash_to_dot: Some(true),
+			default_log_level: "debug".to_string(),
 		};
 		assert_eq!(
 			cfg.log_source,

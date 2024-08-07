@@ -11,11 +11,16 @@ use sqlbuilder::{
 	builder::{time_range_into_timing, QueryPlan, TableSchema},
 	visit::{DefaultIRVisitor, LogQLVisitor},
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+	collections::{HashMap, HashSet},
+	sync::OnceLock,
+};
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 
 const TRACE_ID_NAME: &str = "trace_id";
+
+static DEFAULT_LEVEL: OnceLock<String> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct CKLogQuerier {
@@ -28,6 +33,8 @@ pub struct CKLogQuerier {
 
 impl CKLogQuerier {
 	pub fn new(cli: Client, table: String, ck_cfg: ClickhouseLog) -> Self {
+		let lvl = ck_cfg.default_log_level.clone();
+		_ = DEFAULT_LEVEL.set(lvl);
 		let (meta, tx) = SeriesStore::new();
 		Self {
 			cli,
@@ -381,7 +388,7 @@ impl TryFrom<Vec<JSONValue>> for LogRecod {
 				.ok_or(CKConvertErr::Timestamp)?,
 			trace_id: value[1].as_str().unwrap_or("").to_string(),
 			span_id: value[2].as_str().unwrap_or("").to_string(),
-			severity_text: value[3].as_str().unwrap_or("").to_string(),
+			severity_text: consistent_level(value[3].as_str().unwrap_or("")),
 			service_name: value[5].as_str().unwrap_or("").to_string(),
 			body: value[6].as_str().unwrap_or("").to_string(),
 			resource_attr: json_object_to_map_s_s(&value[7])?,
@@ -390,6 +397,13 @@ impl TryFrom<Vec<JSONValue>> for LogRecod {
 			log_attributes: json_object_to_map_s_s(&value[10])?,
 		};
 		Ok(record)
+	}
+}
+
+fn consistent_level(lvl: &str) -> String {
+	match LogLevel::try_from(lvl) {
+		Ok(l) => l.into(),
+		Err(_) => DEFAULT_LEVEL.get().unwrap().clone(),
 	}
 }
 
