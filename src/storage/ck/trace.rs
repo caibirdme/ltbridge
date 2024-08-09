@@ -6,7 +6,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use itertools::izip;
-use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
+use opentelemetry_proto::tonic::trace::v1::{
+	span::SpanKind, status::StatusCode,
+};
 use reqwest::Client;
 use serde_json::Value as JSONValue;
 use sqlbuilder::builder::TableSchema;
@@ -272,7 +274,9 @@ impl From<TraceRecord> for SpanItem {
 			scope_version: str_2_opt_str(&value.scope_version),
 			span_attributes: value.span_attributes,
 			duration: value.duration,
-			status_code: value.status_code.parse().ok(),
+			// https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/internal/coreinternal/traceutil/traceutil.go#L37
+			// collector sets status_code as "STATUS_CODE_OK" rather than its corresponding number
+			status_code: parse_status_code(&value.status_code),
 			status_message: str_2_opt_str(&value.status_message),
 			span_events: izip!(
 				value.events_ts,
@@ -301,6 +305,17 @@ impl From<TraceRecord> for SpanItem {
 			.collect(),
 		}
 	}
+}
+
+static STATUS_CODE_STR: [StatusCode; 3] =
+	[StatusCode::Unset, StatusCode::Ok, StatusCode::Error];
+
+fn parse_status_code(s: &str) -> Option<i32> {
+	STATUS_CODE_STR
+		.iter()
+		.find(|k| (*k).as_str_name() == s)
+		.map(|k| (*k).into())
+		.or(Some(StatusCode::Unset.into()))
 }
 
 fn str_2_opt_str(s: &str) -> Option<String> {
