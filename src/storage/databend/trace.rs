@@ -162,6 +162,9 @@ impl TableSchema for TraceTable {
 	fn trace_key(&self) -> &str {
 		self.trace_key()
 	}
+	fn span_id_key(&self) -> &str {
+		"span_id"
+	}
 	fn resources_key(&self) -> &str {
 		"resource_attributes"
 	}

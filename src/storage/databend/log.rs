@@ -190,6 +190,9 @@ impl TableSchema for LogTable {
 	fn trace_key(&self) -> &str {
 		self.trace_id
 	}
+	fn span_id_key(&self) -> &str {
+		"span_id"
+	}
 	fn resources_key(&self) -> &str {
 		"resources"
 	}

@@ -2848,8 +2848,10 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "common",
+ "itertools 0.13.0",
  "logql",
  "ordered-float",
+ "traceql",
 ]
 
 [[package]]

@@ -75,6 +75,7 @@ pub trait TableSchema {
 	fn msg_key(&self) -> &str;
 	fn level_key(&self) -> &str;
 	fn trace_key(&self) -> &str;
+	fn span_id_key(&self) -> &str;
 	fn resources_key(&self) -> &str;
 	fn attributes_key(&self) -> &str;
 }

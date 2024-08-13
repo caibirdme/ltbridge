@@ -1,4 +1,4 @@
-use super::common::*;
+use super::{common::*, converter::CKLogConverter};
 use crate::config::ClickhouseTrace;
 use crate::storage::trace::{Links, SpanEvent};
 use crate::storage::{trace::*, *};
@@ -11,7 +11,7 @@ use opentelemetry_proto::tonic::trace::v1::{
 };
 use reqwest::Client;
 use serde_json::Value as JSONValue;
-use sqlbuilder::builder::TableSchema;
+use sqlbuilder::{builder::TableSchema, trace::ComplexQuery};
 use std::collections::HashMap;
 use traceql::*;
 use tracing::error;
@@ -64,10 +64,28 @@ impl TraceStorage for CKTraceQuerier {
 	}
 	async fn search_span(
 		&self,
-		_expr: &Expression,
+		expr: &Expression,
 		_opt: QueryLimits,
 	) -> Result<Vec<SpanItem>> {
-		Ok(vec![])
+		let converter = CKLogConverter::new(self.schema.clone(), true);
+		let sql =
+			ComplexQuery::new(expr, self.schema.clone(), converter).as_sql();
+		let mut results = vec![];
+		let rows =
+			send_query(self.client.clone(), self.ck_cfg.common.clone(), sql)
+				.await
+				.map_err(|e| {
+					error!("Query trace error: {:?}", e);
+					e
+				})?;
+		for row in rows {
+			let record = TraceRecord::try_from(row).map_err(|e| {
+				error!("Convert trace record error: {:?}", e);
+				e
+			})?;
+			results.push(record.into());
+		}
+		Ok(results)
 	}
 }
 
@@ -95,7 +113,7 @@ AND Timestamp <= end
 		db,
 		trace_ts_table,
 		schema.projection().join(","),
-		schema.full_table(),
+		schema.table,
 	);
 	sql.replace("\n", " ").replace("\t", " ")
 }
@@ -114,7 +132,7 @@ impl TraceTable {
 		trace_ts_table: String,
 	) -> Self {
 		Self {
-			table,
+			table: format!("{}.{}", database, table),
 			database,
 			trace_ts_table,
 		}
@@ -124,9 +142,6 @@ impl TraceTable {
 	}
 	fn database(&self) -> &str {
 		self.database.as_str()
-	}
-	fn full_table(&self) -> String {
-		format!("{}.{}", self.database, self.table)
 	}
 	fn trace_ts_table(&self) -> &str {
 		self.trace_ts_table.as_str()
@@ -334,7 +349,7 @@ impl TableSchema for TraceTable {
 		"Timestamp"
 	}
 	fn table(&self) -> &str {
-		self.table.as_str()
+		&self.table
 	}
 	fn level_key(&self) -> &str {
 		"SeverityNumber"
@@ -342,10 +357,60 @@ impl TableSchema for TraceTable {
 	fn trace_key(&self) -> &str {
 		"TraceId"
 	}
+	fn span_id_key(&self) -> &str {
+		"SpanId"
+	}
 	fn attributes_key(&self) -> &str {
 		"SpanAttributes"
 	}
 	fn resources_key(&self) -> &str {
 		"ResourceAttributes"
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use pretty_assertions::assert_eq;
+	use sqlparser::{dialect::AnsiDialect, parser::Parser};
+	use std::{fs, path::PathBuf};
+	use traceql::parse_traceql;
+
+	#[test]
+	fn expand_complex_traceql() {
+		let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+		d.push("src/storage/ck/traceql_test.yaml");
+		let test_cases = fs::read_to_string(d).unwrap();
+
+		#[derive(serde::Deserialize)]
+		struct TestCase {
+			input: String,
+			expect: String,
+		}
+		let cases: HashMap<String, TestCase> =
+			serde_yaml::from_str(&test_cases).unwrap();
+		let schema = TraceTable::new(
+			"otel_traces".to_string(),
+			"otlp".to_string(),
+			"xx".to_string(),
+		);
+		for (name, tc) in cases {
+			let expr = parse_traceql(&tc.input).unwrap();
+			let sql = ComplexQuery::new(
+				&expr,
+				schema.clone(),
+				CKLogConverter::new(schema.clone(), true),
+			)
+			.as_sql();
+			let actual_ast = Parser::parse_sql(&AnsiDialect {}, &sql).unwrap();
+			let expect_ast =
+				Parser::parse_sql(&AnsiDialect {}, &tc.expect).unwrap();
+			assert_eq!(
+				expect_ast[0].to_string(),
+				actual_ast[0].to_string(),
+				"case: {}",
+				name
+			);
+		}
 	}
 }

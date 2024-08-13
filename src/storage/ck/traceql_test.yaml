@@ -1,0 +1,87 @@
+three_spansets:
+  input: '{resource.app="camp" && serviceName="fooSvc"} && ({span.qwe="qqq"} || {foo>10})'
+  expect: |
+    SELECT *
+    FROM otlp.otel_traces sp
+    WHERE sp.SpanId IN
+        (SELECT SpanId
+        FROM (
+                (SELECT SpanId,
+                        TraceId
+                  FROM otlp.otel_traces
+                  WHERE (ResourceAttributes['app'] = 'camp'
+                        AND ServiceName = 'fooSvc'))
+              UNION
+                (SELECT SpanId,
+                        TraceId
+                  FROM otlp.otel_traces
+                  WHERE SpanAttributes['qwe'] = 'qqq')
+              UNION
+                (SELECT SpanId,
+                        TraceId
+                  FROM otlp.otel_traces
+                  WHERE (SpanAttributes['foo'] > 10 OR ResourceAttributes['foo']>10))) AS sub
+        WHERE (sub.TraceId IN
+                      (SELECT TraceId
+                        FROM otlp.otel_traces
+                        WHERE (ResourceAttributes['app'] = 'camp'
+                              AND ServiceName = 'fooSvc'))
+                    AND (sub.TraceId IN
+                            (SELECT TraceId
+                            FROM otlp.otel_traces
+                            WHERE SpanAttributes['qwe'] = 'qqq')
+                          OR sub.TraceId IN
+                            (SELECT TraceId
+                            FROM otlp.otel_traces
+                            WHERE (SpanAttributes['foo'] > 10 OR ResourceAttributes['foo']>10))))) LIMIT 500
+
+two_spansets:
+  input: '{resource.app="camp" && serviceName="fooSvc"} && {qwe="qqq"}'
+  expect: |
+    SELECT *
+    FROM otlp.otel_traces sp
+    WHERE sp.SpanId IN (
+      SELECT SpanId
+      FROM (
+        (SELECT SpanId, TraceId
+        FROM otlp.otel_traces
+        WHERE (ResourceAttributes['app'] = 'camp'
+          AND ServiceName = 'fooSvc'))
+        UNION
+        (SELECT SpanId, TraceId
+        FROM otlp.otel_traces
+        WHERE (SpanAttributes['qwe'] = 'qqq' OR ResourceAttributes['qwe'] = 'qqq'))
+      ) AS sub
+      WHERE (sub.TraceId IN (
+            SELECT TraceId
+            FROM otlp.otel_traces
+            WHERE (ResourceAttributes['app'] = 'camp'
+              AND ServiceName = 'fooSvc')
+          )
+          AND sub.TraceId IN (
+            SELECT TraceId
+            FROM otlp.otel_traces
+            WHERE (SpanAttributes['qwe'] = 'qqq' OR ResourceAttributes['qwe'] = 'qqq')
+          ))) LIMIT 500
+
+with_duration_and_status:
+  input: '{resource.app="camp" && duration > 90s && status!=ok}'
+  expect: |
+    SELECT *
+    FROM otlp.otel_traces sp
+    WHERE sp.SpanId IN (
+      SELECT SpanId
+      FROM (
+        (SELECT SpanId, TraceId
+        FROM otlp.otel_traces
+        WHERE (ResourceAttributes['app'] = 'camp'
+          AND (Duration > 90000000000
+          AND StatusCode != 1)))
+      ) AS sub
+      WHERE sub.TraceId IN (
+            SELECT TraceId
+            FROM otlp.otel_traces
+            WHERE (ResourceAttributes['app'] = 'camp'
+              AND (Duration > 90000000000
+              AND StatusCode != 1))
+          )) LIMIT 500
