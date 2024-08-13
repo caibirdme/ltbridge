@@ -10,3 +10,5 @@ chrono ={ workspace = true }
 ordered-float = {workspace = true}
 common = {path = "../common"}
 logql = {path = "../logql"}
+traceql = {path = "../traceql"}
+itertools = { workspace = true }

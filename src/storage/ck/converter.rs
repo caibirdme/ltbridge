@@ -2,6 +2,7 @@ use chrono::NaiveDateTime;
 use itertools::Itertools as _;
 use sqlbuilder::builder::*;
 
+#[derive(Clone)]
 pub struct CKLogConverter<T: TableSchema> {
 	table: T,
 	replace_dash_to_dot: bool,

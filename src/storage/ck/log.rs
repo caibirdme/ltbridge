@@ -440,6 +440,9 @@ impl TableSchema for LogTable {
 	fn trace_key(&self) -> &str {
 		"TraceId"
 	}
+	fn span_id_key(&self) -> &str {
+		"SpanId"
+	}
 	fn attributes_key(&self) -> &str {
 		"LogAttributes"
 	}
