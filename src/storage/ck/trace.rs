@@ -65,7 +65,7 @@ impl TraceStorage for CKTraceQuerier {
 	async fn search_span(
 		&self,
 		expr: &Expression,
-		_opt: QueryLimits,
+		opt: QueryLimits,
 	) -> Result<Vec<SpanItem>> {
 		match expr {
 			Expression::Logical(_, _, _) => {
@@ -78,6 +78,7 @@ impl TraceStorage for CKTraceQuerier {
 					sp,
 					self.schema.clone(),
 					self.schema.projection(),
+					opt.range,
 					converter,
 				);
 				let mut results = vec![];
@@ -417,6 +418,7 @@ mod tests {
 					&sp,
 					schema.clone(),
 					schema.projection(),
+					common::TimeRange::default(),
 					converter,
 				);
 				let actual_ast =
