@@ -280,6 +280,7 @@ pub fn single_spanset_query<T, C>(
 	spanset: &SpanSet,
 	schema: T,
 	projection: Vec<String>,
+	time_range: common::TimeRange,
 	converter: C,
 ) -> String
 where
@@ -294,7 +295,7 @@ where
 		Some(selection),
 		vec![],
 		vec![],
-		vec![],
+		super::builder::time_range_into_timing(&time_range),
 		Some(500),
 	)
 	.as_sql()
