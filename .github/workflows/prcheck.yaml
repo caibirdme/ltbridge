@@ -35,7 +35,7 @@ jobs:
       run: cargo binstall -y cargo-sort
     - name: run checkers
       run: |
-        cargo sort -c
+        cargo sort -c -w
         cargo fmt -- --check
         cargo clippy -- -D warnings
         cargo test

@@ -7,8 +7,9 @@ authors = ["caibirdme <492877816@qq.com>"]
 
 [dependencies]
 chrono ={ workspace = true }
-ordered-float = {workspace = true}
-common = {path = "../common"}
-logql = {path = "../logql"}
-traceql = {path = "../traceql"}
+common = { path = "../common" }
 itertools = { workspace = true }
+logql = { path = "../logql" }
+opentelemetry-proto = { workspace = true }
+ordered-float = { workspace = true }
+traceql = { path = "../traceql" }

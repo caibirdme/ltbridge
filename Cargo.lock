@@ -2850,6 +2850,7 @@ dependencies = [
  "common",
  "itertools 0.13.0",
  "logql",
+ "opentelemetry-proto",
  "ordered-float",
  "traceql",
 ]
