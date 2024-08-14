@@ -5,6 +5,6 @@ with_duration_and_status:
     FROM otlp.otel_traces
     WHERE (ResourceAttributes['app'] = 'camp'
           AND (Duration > 90000000000
-          AND (StatusCode != 1
+          AND (StatusCode != 'STATUS_CODE_OK'
           AND ServiceName='haha'))
       ) LIMIT 500
