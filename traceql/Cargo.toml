@@ -6,10 +6,9 @@ rust-version = "1.76.0"
 authors = ["caibirdme <492877816@qq.com>"]
 
 [dependencies]
+humantime = { workspace = true }
 nom = { workspace = true }
 ordered-float = { workspace = true }
-humantime = { workspace = true }
-
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

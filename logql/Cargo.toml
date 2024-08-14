@@ -6,10 +6,9 @@ rust-version = "1.76.0"
 authors = ["caibirdme <492877816@qq.com>"]
 
 [dependencies]
-nom = { workspace = true }
 humantime-serde = { workspace = true }
 itertools = { workspace = true }
-
+nom = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

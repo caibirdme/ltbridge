@@ -3,11 +3,13 @@ use super::builder::{
 	TableSchema,
 };
 use itertools::Itertools as _;
+use opentelemetry_proto::tonic::trace::v1::status::StatusCode as PBStatusCode;
 use traceql::{
 	ComparisonOperator, Expression, FieldExpr, FieldType, FieldValue,
-	IntrisincField, LogicalOperator, SpanSet,
+	IntrisincField, LogicalOperator, SpanSet, StatusCode,
 };
 
+#[allow(dead_code)]
 enum SubQuery<T: TableSchema, C: QueryConverter> {
 	Basic(QueryPlan<T, C>),
 	And(Box<SubQuery<T, C>>, Box<SubQuery<T, C>>),
@@ -31,7 +33,7 @@ where
 	{
 		match expr {
 			Expression::SpanSet(spanset) => {
-				let selection = spanset_to_qp(spanset);
+				let selection = spanset_to_selection(spanset);
 				let mut qp = QueryPlan::new(
 					converter.clone(),
 					schema.clone(),
@@ -49,26 +51,19 @@ where
 				qp.projection = vec![schema.trace_key().to_string()];
 				SubQuery::Basic(qp)
 			}
-			Expression::Logical(left, op, right) => {
-				let l =
-					Self::new(converter.clone(), left, schema.clone(), spans);
-				let r =
-					Self::new(converter.clone(), right, schema.clone(), spans);
-				match op {
-					LogicalOperator::And => {
-						SubQuery::And(Box::new(l), Box::new(r))
-					}
-					LogicalOperator::Or => {
-						SubQuery::Or(Box::new(l), Box::new(r))
-					}
-				}
+			Expression::Logical(_, _, _) => {
+				unimplemented!("logical expression")
 			}
 		}
 	}
 	fn as_sql(&self) -> String {
 		match self {
 			SubQuery::Basic(qp) => {
-				format!("sub.{} IN ({})", qp.schema.trace_key(), qp.as_sql())
+				format!(
+					"sub.{} GLOBAL IN ({})",
+					qp.schema.trace_key(),
+					qp.as_sql()
+				)
 			}
 			SubQuery::And(l, r) => {
 				let l_sql = l.as_sql();
@@ -84,7 +79,7 @@ where
 	}
 }
 
-fn spanset_to_qp(spanset: &SpanSet) -> Selection {
+fn spanset_to_selection(spanset: &SpanSet) -> Selection {
 	match spanset {
 		SpanSet::Expr(expr) => {
 			// expand unscoped into (resource or span)
@@ -98,16 +93,16 @@ fn spanset_to_qp(spanset: &SpanSet) -> Selection {
 					operator: expr.operator,
 				});
 				return Selection::LogicalOr(
-					Box::new(spanset_to_qp(&left)),
-					Box::new(spanset_to_qp(&right)),
+					Box::new(spanset_to_selection(&left)),
+					Box::new(spanset_to_selection(&right)),
 				);
 			}
 			let c = field_expr_to_condition(expr);
 			Selection::Unit(c)
 		}
 		SpanSet::Logical(left, op, right) => {
-			let l = spanset_to_qp(left);
-			let r = spanset_to_qp(right);
+			let l = spanset_to_selection(left);
+			let r = spanset_to_selection(right);
 			match op {
 				LogicalOperator::And => {
 					Selection::LogicalAnd(Box::new(l), Box::new(r))
@@ -167,12 +162,22 @@ fn construct_condition(
 	}
 }
 
+fn convert_status_code(s: StatusCode) -> PBStatusCode {
+	match s {
+		StatusCode::Err => PBStatusCode::Error,
+		StatusCode::Ok => PBStatusCode::Ok,
+		StatusCode::Unset => PBStatusCode::Unset,
+	}
+}
+
 fn field_expr_to_condition(expr: &FieldExpr) -> Condition {
 	match &expr.kv {
 		FieldType::Intrinsic(intrisinc) => match intrisinc {
 			IntrisincField::Status(status) => construct_condition(
 				Column::Raw("StatusCode".to_string()),
-				PlaceValue::Integer((*status).into()),
+				PlaceValue::String(
+					convert_status_code(*status).as_str_name().to_string(),
+				),
 				expr.operator,
 			),
 			IntrisincField::Duraion(d) => construct_condition(
@@ -253,7 +258,7 @@ where
 	}
 	pub fn as_sql(&self) -> String {
 		let mut sql = format!(
-			"SELECT * FROM {} sp WHERE sp.{} IN (SELECT {} FROM (",
+			"SELECT * FROM {} sp WHERE sp.{} GLOBAL IN (SELECT {} FROM (",
 			self.schema.table(),
 			self.schema.span_id_key(),
 			self.schema.span_id_key(),
@@ -269,4 +274,28 @@ where
 		sql.push_str(") LIMIT 500");
 		sql
 	}
+}
+
+pub fn single_spanset_query<T, C>(
+	spanset: &SpanSet,
+	schema: T,
+	projection: Vec<String>,
+	converter: C,
+) -> String
+where
+	T: TableSchema,
+	C: QueryConverter,
+{
+	let selection = spanset_to_selection(spanset);
+	QueryPlan::new(
+		converter,
+		schema,
+		projection,
+		Some(selection),
+		vec![],
+		vec![],
+		vec![],
+		Some(500),
+	)
+	.as_sql()
 }

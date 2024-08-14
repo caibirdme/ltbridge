@@ -11,10 +11,10 @@ use opentelemetry_proto::tonic::trace::v1::{
 };
 use reqwest::Client;
 use serde_json::Value as JSONValue;
-use sqlbuilder::{builder::TableSchema, trace::ComplexQuery};
+use sqlbuilder::{builder::TableSchema, trace::single_spanset_query};
 use std::collections::HashMap;
 use traceql::*;
-use tracing::error;
+use tracing::{error, warn};
 
 #[derive(Clone)]
 pub struct CKTraceQuerier {
@@ -67,25 +67,40 @@ impl TraceStorage for CKTraceQuerier {
 		expr: &Expression,
 		_opt: QueryLimits,
 	) -> Result<Vec<SpanItem>> {
-		let converter = CKLogConverter::new(self.schema.clone(), true);
-		let sql =
-			ComplexQuery::new(expr, self.schema.clone(), converter).as_sql();
-		let mut results = vec![];
-		let rows =
-			send_query(self.client.clone(), self.ck_cfg.common.clone(), sql)
+		match expr {
+			Expression::Logical(_, _, _) => {
+				warn!("Search span does not support logical expression");
+				return Ok(vec![]);
+			}
+			Expression::SpanSet(sp) => {
+				let converter = CKLogConverter::new(self.schema.clone(), true);
+				let sql = single_spanset_query(
+					sp,
+					self.schema.clone(),
+					self.schema.projection(),
+					converter,
+				);
+				let mut results = vec![];
+				let rows = send_query(
+					self.client.clone(),
+					self.ck_cfg.common.clone(),
+					sql,
+				)
 				.await
 				.map_err(|e| {
 					error!("Query trace error: {:?}", e);
 					e
 				})?;
-		for row in rows {
-			let record = TraceRecord::try_from(row).map_err(|e| {
-				error!("Convert trace record error: {:?}", e);
-				e
-			})?;
-			results.push(record.into());
+				for row in rows {
+					let record = TraceRecord::try_from(row).map_err(|e| {
+						error!("Convert trace record error: {:?}", e);
+						e
+					})?;
+					results.push(record.into());
+				}
+				Ok(results)
+			}
 		}
-		Ok(results)
 	}
 }
 
@@ -372,7 +387,7 @@ impl TableSchema for TraceTable {
 mod tests {
 	use super::*;
 	use pretty_assertions::assert_eq;
-	use sqlparser::{dialect::AnsiDialect, parser::Parser};
+	use sqlparser::{dialect::ClickHouseDialect, parser::Parser};
 	use std::{fs, path::PathBuf};
 	use traceql::parse_traceql;
 
@@ -396,21 +411,26 @@ mod tests {
 		);
 		for (name, tc) in cases {
 			let expr = parse_traceql(&tc.input).unwrap();
-			let sql = ComplexQuery::new(
-				&expr,
-				schema.clone(),
-				CKLogConverter::new(schema.clone(), true),
-			)
-			.as_sql();
-			let actual_ast = Parser::parse_sql(&AnsiDialect {}, &sql).unwrap();
-			let expect_ast =
-				Parser::parse_sql(&AnsiDialect {}, &tc.expect).unwrap();
-			assert_eq!(
-				expect_ast[0].to_string(),
-				actual_ast[0].to_string(),
-				"case: {}",
-				name
-			);
+			if let Expression::SpanSet(sp) = expr {
+				let converter = CKLogConverter::new(schema.clone(), true);
+				let sql = single_spanset_query(
+					&sp,
+					schema.clone(),
+					schema.projection(),
+					converter,
+				);
+				let actual_ast =
+					Parser::parse_sql(&ClickHouseDialect {}, &sql).unwrap();
+				let expect_ast =
+					Parser::parse_sql(&ClickHouseDialect {}, &tc.expect)
+						.unwrap();
+				assert_eq!(
+					expect_ast[0].to_string(),
+					actual_ast[0].to_string(),
+					"case: {}",
+					name
+				);
+			}
 		}
 	}
 }
