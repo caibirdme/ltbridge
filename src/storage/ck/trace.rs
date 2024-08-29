@@ -73,7 +73,8 @@ impl TraceStorage for CKTraceQuerier {
 				return Ok(vec![]);
 			}
 			Expression::SpanSet(sp) => {
-				let converter = CKLogConverter::new(self.schema.clone(), true);
+				let converter =
+					CKLogConverter::new(self.schema.clone(), true, true);
 				let sql = single_spanset_query(
 					sp,
 					self.schema.clone(),
@@ -413,7 +414,7 @@ mod tests {
 		for (name, tc) in cases {
 			let expr = parse_traceql(&tc.input).unwrap();
 			if let Expression::SpanSet(sp) = expr {
-				let converter = CKLogConverter::new(schema.clone(), true);
+				let converter = CKLogConverter::new(schema.clone(), true, true);
 				let sql = single_spanset_query(
 					&sp,
 					schema.clone(),

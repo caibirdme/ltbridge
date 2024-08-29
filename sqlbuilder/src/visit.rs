@@ -57,6 +57,25 @@ impl IRVisitor for DefaultIRVisitor {
 				cmp: Cmp::Equal(PlaceValue::String(p.value.to_string())),
 			};
 		}
+		if matches!(p.label.to_lowercase().as_str(), "level" | "severitytext") {
+			return Condition {
+				column: Column::Level,
+				cmp: match p.op {
+					Operator::NotEqual => {
+						Cmp::NotEqual(PlaceValue::String(p.value.to_string()))
+					}
+					Operator::RegexMatch => {
+						Cmp::RegexMatch(p.value.to_string())
+					}
+					Operator::RegexNotMatch => {
+						Cmp::RegexNotMatch(p.value.to_string())
+					}
+					Operator::Equal => {
+						Cmp::Equal(PlaceValue::String(p.value.to_string()))
+					}
+				},
+			};
+		}
 		Condition {
 			column: maybe_nested_key(&p.label),
 			cmp: match p.op {
