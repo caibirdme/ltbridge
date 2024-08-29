@@ -90,6 +90,7 @@ pub struct ClickhouseLog {
 	pub replace_dash_to_dot: Option<bool>,
 	#[serde(default = "default_log_level")]
 	pub default_log_level: String,
+	pub level_case_sensitive: Option<bool>,
 }
 
 fn default_log_level() -> String {
@@ -228,6 +229,7 @@ mod tests {
 			},
 			replace_dash_to_dot: None,
 			default_log_level: "info".to_string(),
+			level_case_sensitive: None,
 		});
 		assert_eq!(expect, actual);
 	}
@@ -289,6 +291,7 @@ mod tests {
 			},
 			replace_dash_to_dot: Some(true),
 			default_log_level: "debug".to_string(),
+			level_case_sensitive: Some(false),
 		};
 		assert_eq!(
 			cfg.log_source,

@@ -8,7 +8,7 @@ use logql::parser::{LogQuery, MetricQuery};
 use reqwest::Client;
 use serde_json::Value as JSONValue;
 use sqlbuilder::{
-	builder::{time_range_into_timing, QueryPlan, TableSchema},
+	builder::{time_range_into_timing, QueryConverter, QueryPlan, TableSchema},
 	visit::{DefaultIRVisitor, LogQLVisitor},
 };
 use std::{
@@ -48,6 +48,13 @@ impl CKLogQuerier {
 			tx,
 		}
 	}
+	fn new_converter(&self) -> CKLogConverter<LogTable> {
+		CKLogConverter::new(
+			self.schema.clone(),
+			self.ck_cfg.replace_dash_to_dot.unwrap_or(false),
+			!self.ck_cfg.level_case_sensitive.unwrap_or(false),
+		)
+	}
 }
 
 #[async_trait]
@@ -57,12 +64,7 @@ impl LogStorage for CKLogQuerier {
 		q: &LogQuery,
 		opt: QueryLimits,
 	) -> Result<Vec<LogItem>> {
-		let sql = logql_to_sql(
-			q,
-			opt,
-			&self.schema,
-			self.ck_cfg.replace_dash_to_dot.unwrap_or(false),
-		);
+		let sql = logql_to_sql(q, opt, &self.schema, self.new_converter());
 		let mut results = vec![];
 		let rows =
 			send_query(self.cli.clone(), self.ck_cfg.common.clone(), sql)
@@ -86,7 +88,12 @@ impl LogStorage for CKLogQuerier {
 		q: &MetricQuery,
 		opt: QueryLimits,
 	) -> Result<Vec<MetricItem>> {
-		let sql = new_from_metricquery(q, opt, self.schema.clone());
+		let sql = new_from_metricquery(
+			q,
+			opt,
+			self.schema.clone(),
+			self.new_converter(),
+		);
 		let mut results = vec![];
 		let rows =
 			send_query(self.cli.clone(), self.ck_cfg.common.clone(), sql)
@@ -274,12 +281,13 @@ fn new_from_metricquery(
 	q: &MetricQuery,
 	limits: QueryLimits,
 	schema: LogTable,
+	converter: impl QueryConverter,
 ) -> String {
 	let v = LogQLVisitor::new(DefaultIRVisitor {});
 	let selection = v.visit(&q.log_query);
 	let step = limits.step.unwrap_or(DEFAULT_STEP);
 	let qp = QueryPlan::new(
-		CKLogConverter::new(schema.clone(), false),
+		converter,
 		schema.clone(),
 		vec![
 			to_start_interval(step).to_string(),
@@ -299,12 +307,12 @@ fn logql_to_sql(
 	q: &LogQuery,
 	limits: QueryLimits,
 	schema: &LogTable,
-	replace_dash: bool,
+	converter: impl QueryConverter,
 ) -> String {
 	let v = LogQLVisitor::new(DefaultIRVisitor {});
 	let selection = v.visit(q);
 	let qp = QueryPlan::new(
-		CKLogConverter::new(schema.clone(), replace_dash),
+		converter,
 		schema.clone(),
 		schema.projection(),
 		selection,
@@ -435,7 +443,7 @@ impl TableSchema for LogTable {
 		self.table.as_str()
 	}
 	fn level_key(&self) -> &str {
-		"SeverityNumber"
+		"SeverityText"
 	}
 	fn trace_key(&self) -> &str {
 		"TraceId"
