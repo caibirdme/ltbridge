@@ -87,4 +87,4 @@ sqlparser = "0.50.0"
 
 [build-dependencies]
 anyhow = "1.0.82"
-prost-build = { version = "0.13.1", features = ["default", "cleanup-markdown"] }
+prost-build = { version = "0.13.2", features = ["default", "cleanup-markdown"] }
