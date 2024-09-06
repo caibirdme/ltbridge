@@ -34,7 +34,7 @@ bytes = "1.7.1"
 chrono = { workspace = true }
 common = { path = "common" }
 config = { version = "0.14.0" }
-dashmap = "6.0.1"
+dashmap = "6.1.0"
 databend-driver = { version = "0.20.1" }
 dyn-clone = "1.0.17"
 hex = { version = "0.4.3" }
