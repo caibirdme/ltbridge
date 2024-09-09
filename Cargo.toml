@@ -29,7 +29,7 @@ opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 anyhow = "1.0.87"
 async-trait = "0.1.82"
 axum = { version = "0.7.5", features = ["default"] }
-axum-valid = "0.19.0"
+axum-valid = "0.20.0"
 bytes = "1.7.1"
 chrono = { workspace = true }
 common = { path = "common" }
