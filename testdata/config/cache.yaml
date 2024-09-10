@@ -1,0 +1,59 @@
+server:
+  listen_addr: 0.0.0.0:6778
+  timeout: 30s
+  log:
+    level: info
+    file: stdout
+    # for more details about filter_directives
+    # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+    filter_directives: info,tower_http=off,databend_client=off
+cache:
+  time_to_live: 10m
+log_source:
+  clickhouse:
+    log:
+      url: http://127.0.0.1:8123
+      database: default
+      table: otel_logs
+      username: default
+      password: a11221122a
+      label:
+        resources: ["host.arch", "telemetry.sdk.version", "process.runtime.name"]
+        attributes: ["quantity", "code.function"]
+      replace_dash_to_dot: true
+      default_log_level: debug
+      level_case_sensitive: false
+
+  # quickwit:
+  #   domain: http://127.0.0.1:7280
+  #   index: otel-logs-v0_7
+  #   timeout: 30s
+  # databend:
+  #   drvier: databend
+  #   domain: localhost
+  #   port: 3306
+  #   database: test_log
+  #   username: databend
+  #   password: databend
+  #   # use fulltext index(if you have databend commercial license), otherwise false
+  #   inverted_index: true
+trace_source:
+  clickhouse:
+    trace:
+      url: http://127.0.0.1:8123
+      database: default
+      table: otel_traces
+      username: default
+      password: a11221122a
+      trace_ts_table: otel_traces_trace_id_ts
+  # quickwit:
+  #   domain: http://127.0.0.1:7280
+  #   index: otel-traces-v0_7
+  #   timeout: 30s
+  # databend:
+  #   drvier: databend
+  #   domain: localhost
+  #   port: 3306
+  #   database: test_log
+  #   username: databend
+  #   password: databend

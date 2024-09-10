@@ -76,6 +76,7 @@ impl SeriesStore {
 		for val in &dic[key] {
 			cur.insert(key.clone(), val.clone());
 			Self::convert(keys, idx + 1, dic, cur, ans);
+			// we don't need to remove the key, because it will be overwriten in the next iteration
 		}
 	}
 }

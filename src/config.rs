@@ -5,8 +5,36 @@ use std::{env, time::Duration};
 #[derive(Clone, Deserialize)]
 pub struct AppConfig {
 	pub server: Server,
+	#[serde(default = "default_cache")]
+	pub cache: Cache,
 	pub log_source: DataSource,
 	pub trace_source: DataSource,
+}
+
+#[derive(Clone, Deserialize, Default)]
+pub struct Cache {
+	#[serde(default = "default_cache_max_capacity")]
+	pub max_capacity: u64,
+	#[serde(with = "humantime_serde", default = "default_cache_duration")]
+	pub time_to_live: Duration,
+	#[serde(with = "humantime_serde", default = "default_cache_duration")]
+	pub time_to_idle: Duration,
+}
+
+const fn default_cache() -> Cache {
+	Cache {
+		max_capacity: default_cache_max_capacity(),
+		time_to_live: default_cache_duration(),
+		time_to_idle: default_cache_duration(),
+	}
+}
+
+const fn default_cache_max_capacity() -> u64 {
+	100000
+}
+
+const fn default_cache_duration() -> Duration {
+	Duration::from_secs(2 * 60)
 }
 
 #[derive(Clone, Deserialize)]
@@ -297,6 +325,21 @@ mod tests {
 			cfg.log_source,
 			DataSource::Clickhouse(ClickhouseConf::Log(exp))
 		);
+		assert_eq!(cfg.cache.max_capacity, default_cache_max_capacity());
+		assert_eq!(cfg.cache.time_to_live, default_cache_duration());
+		Ok(())
+	}
+
+	#[test]
+	fn test_cache_config() -> anyhow::Result<()> {
+		let cfg: AppConfig = Config::builder()
+			.add_source(File::with_name("./testdata/config/cache.yaml"))
+			.build()?
+			.try_deserialize()?;
+
+		assert_eq!(cfg.cache.max_capacity, default_cache_max_capacity());
+		assert_eq!(cfg.cache.time_to_live, Duration::from_secs(10 * 60));
+		assert_eq!(cfg.cache.time_to_idle, default_cache_duration());
 		Ok(())
 	}
 }
