@@ -2,7 +2,7 @@ use anyhow::Result;
 use ltbridge::storage::{new_log_source, new_trace_source};
 use ltbridge::{config::AppConfig, metrics, routes, state};
 use moka::sync::Cache;
-use std::{fs::OpenOptions, sync::Arc, time::Duration};
+use std::{fs::OpenOptions, sync::Arc};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -20,9 +20,9 @@ async fn main() -> Result<()> {
 	let metrics_handle = metrics::setup_metrcis();
 	// init cache
 	let cache = Cache::builder()
-		.max_capacity(1000)
-		.time_to_live(Duration::from_secs(2 * 60))
-		.time_to_idle(Duration::from_secs(2 * 60))
+		.max_capacity(cfg.cache.max_capacity)
+		.time_to_live(cfg.cache.time_to_live)
+		.time_to_idle(cfg.cache.time_to_idle)
 		.build();
 
 	let trace_handle = new_trace_source(cfg.trace_source.clone()).await?;
