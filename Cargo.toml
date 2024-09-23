@@ -58,7 +58,7 @@ serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.128" }
 serde_with = { version = "3.9.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
-thiserror = { version = "1.0.63" }
+thiserror = { version = "1.0.64" }
 tokio = { version = "1.40.0", features = ["full"] }
 tokio-stream = { version = "0.1.16" }
 tower = { version = "0.5.1" }
