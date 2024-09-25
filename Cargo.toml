@@ -83,7 +83,7 @@ validator = { version = "0.18.1", features = ["derive"] }
 pretty_assertions = { workspace = true }
 serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
-sqlparser = "0.50.0"
+sqlparser = "0.51.0"
 
 [build-dependencies]
 anyhow = "1.0.89"
