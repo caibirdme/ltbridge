@@ -22,7 +22,7 @@ itertools = { version = "0.13.0" }
 ordered-float = { version = "4.3.0" }
 humantime = { version = "2.1.0" }
 chrono = { version = "0.4.38", features = ["serde"] }
-pretty_assertions = "1.4.0"
+pretty_assertions = "1.4.1"
 opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 
 [dependencies]
