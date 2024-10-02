@@ -52,7 +52,7 @@ opentelemetry_sdk = { version = "0.24.1", features = ["metrics"] }
 ordered-float = { version = "4.3.0" }
 prometheus = "0.13.4"
 prost = { version = "0.13.3" }
-reqwest = { version = "0.12.7", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
+reqwest = { version = "0.12.8", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 reqwest-middleware = "0.3.3"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.128" }
