@@ -56,7 +56,7 @@ reqwest = { version = "0.12.8", features = ["json", "native-tls-vendored", "gzip
 reqwest-middleware = "0.3.3"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.128" }
-serde_with = { version = "3.10.0", features = ["json"] }
+serde_with = { version = "3.11.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
 thiserror = { version = "1.0.64" }
 tokio = { version = "1.40.0", features = ["full"] }
