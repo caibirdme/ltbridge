@@ -9,7 +9,7 @@ use axum_valid::Valid;
 use itertools::Itertools;
 use logql::parser;
 use moka::sync::Cache;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 pub async fn query_range(
 	State(state): State<AppState>,
@@ -31,7 +31,7 @@ pub async fn query_range(
 	};
 	if let Ok(inner) = &resp {
 		let d = serde_json::to_vec(inner).unwrap();
-		state.cache.insert(cache_key, d);
+		state.cache.insert(cache_key, Arc::new(d));
 	}
 	resp
 }
@@ -52,7 +52,7 @@ pub async fn loki_is_working() -> Result<QueryRangeResponse, AppError> {
 
 fn get_cached_query(
 	key: &str,
-	cache: Cache<String, Vec<u8>>,
+	cache: Cache<String, Arc<Vec<u8>>>,
 ) -> Option<QueryRangeResponse> {
 	if let Some(v) = cache.get(key) {
 		if let Ok(d) = serde_json::from_slice(&v) {

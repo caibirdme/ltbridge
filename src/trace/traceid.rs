@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::*;
 use crate::{
 	errors::AppError, proto::tempopb::Trace, state::AppState,
@@ -97,21 +99,25 @@ pub async fn get_trace_by_id(
 	Ok(val)
 }
 
-fn cache_trace(trace_id: &str, trace: &Trace, cache: Cache<String, Vec<u8>>) {
+fn cache_trace(
+	trace_id: &str,
+	trace: &Trace,
+	cache: Cache<String, Arc<Vec<u8>>>,
+) {
 	let d = trace.encode_to_vec();
 	let key = get_trace_cache_key(trace_id);
-	cache.insert(key.clone(), d.clone());
+	cache.insert(key.clone(), Arc::new(d.clone()));
 }
 
 fn get_cached_trace(
 	trace_id: &str,
-	cache: Cache<String, Vec<u8>>,
+	cache: Cache<String, Arc<Vec<u8>>>,
 ) -> Result<Option<Trace>, AppError> {
 	let data = cache.get(get_trace_cache_key(trace_id).as_str());
 	match data {
 		Some(data) => {
-			let trace =
-				Message::decode(Bytes::from(data)).map_err(|e| anyhow!(e))?;
+			let s: &[u8] = data.as_ref();
+			let trace = Message::decode(s).map_err(|e| anyhow!(e))?;
 			Ok(Some(trace))
 		}
 		None => Ok(None),
