@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::*;
 use crate::{errors::AppError, state::AppState};
 use axum::{
@@ -31,7 +33,7 @@ pub async fn query_labels(
 	};
 	if should_cache {
 		let d = serde_json::to_vec(&resp).unwrap();
-		cache.insert(label_cache_key().to_string(), d);
+		cache.insert(label_cache_key().to_string(), Arc::new(d));
 	}
 	Ok(resp)
 }
@@ -96,7 +98,7 @@ pub async fn query_label_values(
 	};
 	if should_cache {
 		let d = serde_json::to_vec(&resp).unwrap();
-		cache.insert(cache_key, d);
+		cache.insert(cache_key, Arc::new(d));
 	}
 	Ok(resp)
 }
@@ -140,7 +142,7 @@ pub async fn query_series(
 		.await?;
 	if !values.is_empty() {
 		let d = serde_json::to_vec(&values).unwrap();
-		state.cache.insert(series_cache_key(), d);
+		state.cache.insert(series_cache_key(), Arc::new(d));
 	}
 	Ok(Json(QuerySeriesResponse {
 		status: ResponseStatus::Success,

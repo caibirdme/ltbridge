@@ -10,6 +10,6 @@ pub struct AppState {
 	pub config: Arc<config::AppConfig>,
 	pub log_handle: Box<dyn LogStorage>,
 	pub trace_handle: Box<dyn TraceStorage>,
-	pub cache: Cache<String, Vec<u8>>,
+	pub cache: Cache<String, Arc<Vec<u8>>>,
 	pub metrics: Arc<metrics::Instrumentations>,
 }
