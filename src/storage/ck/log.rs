@@ -169,7 +169,7 @@ impl CKLogQuerier {
 	async fn record_label(&self, records: &[LogItem]) {
 		let cfg = self.ck_cfg.label.clone();
 		for name in Self::collect_svcname(records) {
-			let _ = self.tx.send((LabelType::ServiceName, name.clone())).await;
+			let _ = self.tx.send((LabelType::ServiceName, name)).await;
 		}
 		for level in Self::collect_level(records) {
 			let _ = self.tx.send((LabelType::Level, level)).await;
