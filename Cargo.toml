@@ -55,7 +55,7 @@ prost = { version = "0.13.3" }
 reqwest = { version = "0.12.8", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 reqwest-middleware = "0.3.3"
 serde = { version = "1.0.210", features = ["derive"] }
-serde_json = { version = "1.0.129" }
+serde_json = { version = "1.0.132" }
 serde_with = { version = "3.11.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
 thiserror = { version = "1.0.64" }
