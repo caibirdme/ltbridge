@@ -8,6 +8,7 @@ use axum::{
 };
 use common::TimeRange;
 use logql::parser;
+use moka::sync::Cache;
 
 pub async fn query_labels(
 	State(state): State<AppState>,
@@ -143,9 +144,46 @@ pub async fn query_series(
 	if !values.is_empty() {
 		let d = serde_json::to_vec(&values).unwrap();
 		state.cache.insert(series_cache_key(), Arc::new(d));
+		let v2 = convert_vec_hashmap(&values);
+		cache_values(&state.cache, &v2);
 	}
 	Ok(Json(QuerySeriesResponse {
 		status: ResponseStatus::Success,
 		data: values,
 	}))
+}
+
+fn cache_values(
+	cache: &Cache<String, Arc<Vec<u8>>>,
+	values: &HashMap<&String, Vec<&String>>,
+) {
+	for (k, v) in values {
+		let key = label_values_cache_key(k);
+		let resp = CacheLabelResponse {
+			status: ResponseStatus::Success,
+			data: v,
+		};
+		let d = serde_json::to_vec(&resp).unwrap();
+		cache.insert(key, Arc::new(d));
+	}
+}
+
+fn convert_vec_hashmap(
+	input: &Vec<HashMap<String, String>>,
+) -> HashMap<&String, Vec<&String>> {
+	let mut result: HashMap<&String, Vec<&String>> = HashMap::new();
+
+	for map in input {
+		for (key, value) in map {
+			result.entry(key).or_default().push(value);
+		}
+	}
+
+	result
+}
+
+#[derive(Serialize, Debug)]
+struct CacheLabelResponse<'a> {
+	pub status: ResponseStatus,
+	pub data: &'a Vec<&'a String>,
 }
