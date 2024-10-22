@@ -11,6 +11,11 @@ use logql::parser;
 use moka::sync::Cache;
 use tracing::debug;
 
+// since tag key and value of any services may contain '/' '-' '|' ...
+// we use '---' '|||' to split them
+const KEY_SPLITER: &str = "---";
+const PAIR_SPLITER: &str = "|||";
+
 pub async fn query_labels(
 	State(state): State<AppState>,
 	Query(req): Query<QueryLabelsRequest>,
@@ -234,19 +239,19 @@ fn get_rest_label_pairs(
 	using_key: &str,
 	cache_key_with_matches: &str,
 ) -> Vec<parser::LabelPair> {
-	let start = using_key.len() + 1;
+	let start = using_key.len() + KEY_SPLITER.len();
 	if start >= cache_key_with_matches.len() {
 		return vec![];
 	}
 	let suffix = &cache_key_with_matches[start..];
 	let pairs = suffix
-		.split('-')
+		.split(KEY_SPLITER)
 		.filter_map(|s| {
-			let parts = s.split('/').collect::<Vec<_>>();
+			let parts = s.split(PAIR_SPLITER).collect::<Vec<_>>();
 			if parts.len() == 3 {
 				Some(parser::LabelPair {
 					label: parts[0].to_string(),
-				op: str_to_operator(parts[1].chars().next().unwrap()),
+					op: str_to_operator(parts[1].chars().next().unwrap_or('0')),
 					value: parts[2].to_string(),
 				})
 			} else {
@@ -293,15 +298,15 @@ fn canonicalize_matches(matches: &[parser::LabelPair]) -> String {
 	});
 	let mut s = arr.into_iter().fold(String::new(), |mut acc, v| {
 		acc.push_str(&v.label);
-		acc.push('/');
+		acc.push_str(PAIR_SPLITER);
 		acc.push(operator_to_str(&v.op));
-		acc.push('/');
+		acc.push_str(PAIR_SPLITER);
 		acc.push_str(&v.value);
-		acc.push('-');
+		acc.push_str(KEY_SPLITER);
 		acc
 	});
-	// remove the last '-'
-	s.truncate(s.len() - 1);
+	// remove the last '|||'
+	s.truncate(s.len() - KEY_SPLITER.len());
 	s
 }
 
@@ -398,7 +403,7 @@ mod tests {
 			("cc:series:", "cc:series:", vec![]),
 			(
 				"cc:series:",
-				"cc:series:-k1/0/v1",
+				"cc:series:---k1|||0|||v1",
 				vec![LabelPair {
 					label: "k1".to_string(),
 					op: parser::Operator::Equal,
@@ -407,7 +412,7 @@ mod tests {
 			),
 			(
 				"cc:series:",
-				"cc:series:-k1/0/v1-k2/1/v2",
+				"cc:series:---k1|||0|||v1---k2|||1|||v2",
 				vec![
 					LabelPair {
 						label: "k1".to_string(),
@@ -422,8 +427,8 @@ mod tests {
 				],
 			),
 			(
-				"cc:series:-k1/0/v1",
-				"cc:series:-k1/0/v1-k2/1/v2",
+				"cc:series:---k1|||0|||v1",
+				"cc:series:---k1|||0|||v1---k2|||1|||v2",
 				vec![LabelPair {
 					label: "k2".to_string(),
 					op: parser::Operator::NotEqual,
@@ -431,8 +436,8 @@ mod tests {
 				}],
 			),
 			(
-				"cc:series:-k1/0/v1-k2/1/v2",
-				"cc:series:-k1/0/v1-k2/1/v2-k3/2/v3",
+				"cc:series:---k1|||0|||v1---k2|||1|||v2",
+				"cc:series:---k1|||0|||v1---k2|||1|||v2---k3|||2|||v3",
 				vec![LabelPair {
 					label: "k3".to_string(),
 					op: parser::Operator::RegexMatch,
@@ -455,7 +460,7 @@ mod tests {
 					op: parser::Operator::Equal,
 					value: "v1".to_string(),
 				}],
-				"k1/0/v1",
+				"k1|||0|||v1",
 			),
 			(
 				vec![
@@ -470,7 +475,7 @@ mod tests {
 						value: "v2".to_string(),
 					},
 				],
-				"k1/0/v1-k2/1/v2",
+				"k1|||0|||v1---k2|||1|||v2",
 			),
 			(
 				vec![
@@ -490,7 +495,7 @@ mod tests {
 						value: "ss".to_string(),
 					},
 				],
-				"ServiceName/3/ss-k1/0/v1-k2/1/v2",
+				"ServiceName|||3|||ss---k1|||0|||v1---k2|||1|||v2",
 			),
 			(
 				vec![
@@ -510,7 +515,7 @@ mod tests {
 						value: "v3".to_string(),
 					},
 				],
-				"k1/0/v1-k2/1/v2-k3/2/v3",
+				"k1|||0|||v1---k2|||1|||v2---k3|||2|||v3",
 			),
 		];
 		for (matches, expected) in test_cases {
