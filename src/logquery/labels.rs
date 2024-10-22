@@ -241,12 +241,17 @@ fn get_rest_label_pairs(
 	let suffix = &cache_key_with_matches[start..];
 	let pairs = suffix
 		.split('-')
-		.map(|s| {
+		.filter_map(|s| {
 			let parts = s.split('/').collect::<Vec<_>>();
-			parser::LabelPair {
-				label: parts[0].to_string(),
+			if parts.len() == 3 {
+				Some(parser::LabelPair {
+					label: parts[0].to_string(),
 				op: str_to_operator(parts[1].chars().next().unwrap()),
-				value: parts[2].to_string(),
+					value: parts[2].to_string(),
+				})
+			} else {
+				debug!("invalid label pair, using_key: {}, cache_key_with_matches: {}, suffix: {}", using_key, cache_key_with_matches, suffix);
+				None
 			}
 		})
 		.collect();
@@ -390,6 +395,7 @@ mod tests {
 	#[test]
 	fn test_get_rest_label_pairs() {
 		let test_cases = vec![
+			("cc:series:", "cc:series:", vec![]),
 			(
 				"cc:series:",
 				"cc:series:-k1/0/v1",
