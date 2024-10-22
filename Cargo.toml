@@ -26,7 +26,7 @@ pretty_assertions = "1.4.1"
 opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 
 [dependencies]
-anyhow = "1.0.89"
+anyhow = "1.0.90"
 async-trait = "0.1.83"
 axum = { version = "0.7.7", features = ["default"] }
 axum-valid = "0.20.0"
@@ -55,7 +55,7 @@ prost = { version = "0.13.3" }
 reqwest = { version = "0.12.8", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 reqwest-middleware = "0.3.3"
 serde = { version = "1.0.210", features = ["derive"] }
-serde_json = { version = "1.0.128" }
+serde_json = { version = "1.0.132" }
 serde_with = { version = "3.11.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
 thiserror = { version = "1.0.64" }
@@ -86,5 +86,5 @@ serde_yaml = "0.9.34"
 sqlparser = "0.50.0"
 
 [build-dependencies]
-anyhow = "1.0.89"
+anyhow = "1.0.90"
 prost-build = { version = "0.13.3", features = ["default", "cleanup-markdown"] }
