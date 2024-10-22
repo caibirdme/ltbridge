@@ -226,13 +226,10 @@ pub struct MetricTable {
 pub struct QuerySeriesRequest {
 	pub start: Option<LokiDate>,
 	pub end: Option<LokiDate>,
-	#[serde(rename = "match", default = "empty_vec")]
-	pub matches: Vec<String>,
+	#[serde(rename = "match[]")]
+	pub matches: String,
 }
 
-fn empty_vec() -> Vec<String> {
-	vec![]
-}
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QuerySeriesResponse {
 	pub status: ResponseStatus,
