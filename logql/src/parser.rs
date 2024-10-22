@@ -12,14 +12,14 @@ use nom::{
 };
 use std::time::Duration;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LabelPair {
 	pub label: String,
 	pub op: Operator,
 	pub value: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Operator {
 	Equal,
 	NotEqual,
