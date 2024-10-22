@@ -77,7 +77,7 @@ fn series_cache_key() -> String {
 }
 
 fn series_cache_key_with_matches(matches: &str) -> String {
-	format!("{}-{}", series_cache_key(), matches)
+	series_cache_key() + KEY_SPLITER + matches
 }
 
 pub async fn query_label_values(
