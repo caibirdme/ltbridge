@@ -115,9 +115,8 @@ pub(crate) async fn send_query(
 			error!("fail to read ck response: {}", e);
 			e
 		})?;
-	let resp: RecordWarpper = serde_json::from_str(&res).map_err(|e| {
+	let resp: RecordWarpper = serde_json::from_str(&res).inspect_err(|_| {
 		error!("fail to parse ck response: {}", res);
-		e
 	})?;
 	Ok(resp.data)
 }
