@@ -57,9 +57,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37bf3594c4c988a53154954629820791dde498571819ae4ca50ca811e060cc95"
+checksum = "c042108f3ed77fd83760a5fd79b53be043192bb3b9dba91d8c574c0ada7850c8"
 
 [[package]]
 name = "approx"
@@ -728,13 +728,14 @@ dependencies = [
 
 [[package]]
 name = "databend-client"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88ca151573bc75cb433d69083e7c4b33287044506de785901b1670cf1d8cd4a2"
+checksum = "60c257bff337efed580f15adad6fb31be3cb4b304deb124651c738b721fc4bb0"
 dependencies = [
  "async-trait",
  "log",
  "once_cell",
+ "parking_lot",
  "percent-encoding",
  "reqwest",
  "serde",
@@ -749,9 +750,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c4f14d5c2d7c45729a9ce368a2a9ecee6462ddcd57b62a29771554ec872a5e1"
+checksum = "861964b7d76df11313938d1b597022003b7a5a1d4b0d641e0e499a1605adbf80"
 dependencies = [
  "arrow",
  "async-compression",
@@ -774,9 +775,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver-core"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9257e3e85264c2abbb2e38e86e00fa447ca6bfd050e0e8d4123da8b4a25d197f"
+checksum = "f656cc269020458a93f61b8e838f2fbb268d6a8192229ae03a74e26c5cd14c61"
 dependencies = [
  "arrow",
  "chrono",
@@ -797,9 +798,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver-macros"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26ac092b746905ad94f7b684ba79047fe4a1726eb79bea74a67d93b08068deb7"
+checksum = "9ce7bb1a702cf9ecffb42e3f78f7aef579a218937f49eb077b064605ca6cb446"
 dependencies = [
  "quote",
  "syn 2.0.82",
@@ -2042,9 +2043,9 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "parking_lot"
-version = "0.12.1"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
+checksum = "f1bf18183cf54e8d6059647fc3063646a1801cf30896933ec2311622cc4b9a27"
 dependencies = [
  "lock_api",
  "parking_lot_core",
@@ -2743,18 +2744,18 @@ checksum = "92d43fe69e652f3df9bdc2b85b2854a0825b86e4fb76bc44d945137d053639ca"
 
 [[package]]
 name = "serde"
-version = "1.0.211"
+version = "1.0.213"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ac55e59090389fb9f0dd9e0f3c09615afed1d19094284d0b200441f13550793"
+checksum = "3ea7893ff5e2466df8d720bb615088341b295f849602c6956047f8f80f0e9bc1"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.211"
+version = "1.0.213"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54be4f245ce16bc58d57ef2716271d0d4519e0f6defa147f6e081005bcb278ff"
+checksum = "7e85ad2009c50b58e87caa8cd6dac16bdf511bbfb7af6c33df902396aa480fa5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3004,18 +3005,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.64"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d50af8abc119fb8bb6dbabcfa89656f46f84aa0ac7688088608076ad2b459a84"
+checksum = "5d11abd9594d9b38965ef50805c5e469ca9cc6f197f883f717e0269a3057b3d5"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.64"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08904e7672f5eb876eaaf87e0ce17857500934f4981c4a0ab2b4aa98baac7fc3"
+checksum = "ae71770322cbd277e69d762a16c444af02aa0575ac0d174f0b9562d3b37f8602"
 dependencies = [
  "proc-macro2",
  "quote",
