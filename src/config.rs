@@ -24,6 +24,7 @@ pub struct Cache {
 	pub time_to_live: Duration,
 	#[serde(with = "humantime_serde", default = "default_cache_duration")]
 	pub time_to_idle: Duration,
+	#[serde(with = "humantime_serde", default)]
 	pub refresh_interval: Option<Duration>,
 }
 
@@ -77,9 +78,7 @@ impl Default for Log {
 	}
 }
 
-fn validate_log_filter_directives(
-	dirs: &str,
-) -> Result<(), ValidationError> {
+fn validate_log_filter_directives(dirs: &str) -> Result<(), ValidationError> {
 	Builder::default()
 		.parse(dirs)
 		.map_err(|_| ValidationError::new("invalid log filter directives"))

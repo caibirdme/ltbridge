@@ -220,6 +220,7 @@ pub async fn background_refresh_series_cache(
 	let mut ticker = interval_at(Instant::now(), interval);
 	loop {
 		ticker.tick().await;
+		debug!("refresh series cache");
 		let v = state
 			.log_handle
 			.series(
@@ -234,6 +235,7 @@ pub async fn background_refresh_series_cache(
 			.await;
 		match v {
 			Ok(v) => {
+				debug!("refresh series cache success, len: {}", v.len());
 				// convert vec<hashmap<string, string>> to json will always success
 				// so we just unwrap here
 				let d = serde_json::to_vec(&v).unwrap();

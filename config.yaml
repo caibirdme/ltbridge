@@ -6,6 +6,10 @@ server:
     # for more details about filter_directives
     # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
     filter_directives: debug,tower_http=off,databend_client=off
+cache:
+  time_to_live: 2m
+  time_to_idle: 2m
+  refresh_interval: 1m
 log_source:
   clickhouse:
     log:
