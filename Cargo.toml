@@ -26,7 +26,7 @@ pretty_assertions = "1.4.1"
 opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 
 [dependencies]
-anyhow = "1.0.90"
+anyhow = "1.0.91"
 async-trait = "0.1.83"
 axum = { version = "0.7.7", features = ["default"] }
 axum-valid = "0.20.0"
@@ -35,7 +35,7 @@ chrono = { workspace = true }
 common = { path = "common" }
 config = { version = "0.14.0" }
 dashmap = "6.1.0"
-databend-driver = { version = "0.21.0" }
+databend-driver = { version = "0.21.1" }
 dyn-clone = "1.0.17"
 hex = { version = "0.4.3" }
 http = "1.1.0"
@@ -55,11 +55,11 @@ prost = { version = "0.13.3" }
 regex = "1.11.0"
 reqwest = { version = "0.12.8", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 reqwest-middleware = "0.3.3"
-serde = { version = "1.0.211", features = ["derive"] }
+serde = { version = "1.0.213", features = ["derive"] }
 serde_json = { version = "1.0.132" }
 serde_with = { version = "3.11.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
-thiserror = { version = "1.0.64" }
+thiserror = { version = "1.0.65" }
 tokio = { version = "1.41.0", features = ["full"] }
 tokio-stream = { version = "0.1.16" }
 tower = { version = "0.5.1" }
@@ -87,5 +87,5 @@ serde_yaml = "0.9.34"
 sqlparser = "0.50.0"
 
 [build-dependencies]
-anyhow = "1.0.90"
+anyhow = "1.0.91"
 prost-build = { version = "0.13.3", features = ["default", "cleanup-markdown"] }
