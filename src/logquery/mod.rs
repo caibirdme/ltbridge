@@ -1,25 +1,20 @@
 use crate::{errors::AppError, storage::QueryLimits};
 use axum::{
-	http::{HeaderMap, StatusCode},
+	http::StatusCode,
 	response::{IntoResponse, Json, Response},
 };
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use common::TimeRange as StorageTimeRange;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 use std::{collections::HashMap, time::Duration};
 use validator::Validate;
 
-pub(crate) mod labels;
-pub(crate) mod query_range;
+pub mod labels;
+pub mod query_range;
 
-pub(crate) use labels::query_label_values;
-pub(crate) use labels::query_labels;
-pub(crate) use labels::query_series;
-pub(crate) use query_range::{loki_is_working, query_range};
-
-const TENANT_KEY: &str = "tenant";
-const DEFAULT_TENANT: &str = "default";
+pub use labels::{query_label_values, query_labels, query_series};
+pub use query_range::{loki_is_working, query_range};
 
 #[derive(Serialize, Deserialize, Hash, Debug, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -216,16 +211,10 @@ fn parse_timestamp(value: &str) -> Result<DateTime<Utc>, AppError> {
 	Err(AppError::InvalidTimeFormat(value.to_string()))
 }
 
-pub struct MetricTable {
-	pub level: String,
-	pub total: u64,
-	pub ts: NaiveDateTime,
-}
-
 #[derive(Deserialize, Debug)]
 pub struct QuerySeriesRequest {
-	pub start: Option<LokiDate>,
-	pub end: Option<LokiDate>,
+	pub _start: Option<LokiDate>,
+	pub _end: Option<LokiDate>,
 	#[serde(rename = "match[]")]
 	pub matches: String,
 }
@@ -238,8 +227,8 @@ pub struct QuerySeriesResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct QueryLabelsRequest {
-	start: Option<LokiDate>,
-	end: Option<LokiDate>,
+	_start: Option<LokiDate>,
+	_end: Option<LokiDate>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -256,16 +245,9 @@ impl IntoResponse for QueryLabelsResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct QueryLabelValuesRequest {
-	start: Option<LokiDate>,
-	end: Option<LokiDate>,
+	_start: Option<LokiDate>,
+	_end: Option<LokiDate>,
 	_query: Option<String>,
-}
-
-pub fn get_tenant(header: &HeaderMap) -> &str {
-	header
-		.get(TENANT_KEY)
-		.map(|v| v.to_str().unwrap())
-		.unwrap_or(DEFAULT_TENANT)
 }
 
 #[cfg(test)]

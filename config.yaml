@@ -2,7 +2,6 @@ server:
   listen_addr: 0.0.0.0:6778
   timeout: 30s
   log:
-    level: info
     file: stdout
     # for more details about filter_directives
     # see: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives

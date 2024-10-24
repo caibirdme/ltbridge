@@ -21,10 +21,6 @@ mod traceid;
 pub(crate) use search::{search_tag_values, search_tags, search_trace_v2};
 pub(crate) use traceid::get_trace_by_id;
 
-pub fn trace_id_2_string(trace_id: &[u8]) -> String {
-	hex::encode(trace_id)
-}
-
 fn spanevent_into_otlp_event(value: &BSpanEvent) -> Event {
 	Event {
 		time_unix_nano: value.ts.timestamp_nanos_opt().unwrap() as u64,

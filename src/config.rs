@@ -1,17 +1,22 @@
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
-use std::{env, time::Duration};
+use std::{env, net::SocketAddr, str::FromStr, time::Duration};
+use tracing_subscriber::filter::Builder;
+use validator::{Validate, ValidationError};
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Validate)]
 pub struct AppConfig {
+	#[validate(nested)]
 	pub server: Server,
 	#[serde(default = "default_cache")]
+	#[validate(nested)]
 	pub cache: Cache,
 	pub log_source: DataSource,
 	pub trace_source: DataSource,
 }
 
-#[derive(Clone, Deserialize, Default)]
+#[derive(Clone, Deserialize, Default, Validate)]
+#[validate(schema(function = "validate_cache_config"))]
 pub struct Cache {
 	#[serde(default = "default_cache_max_capacity")]
 	pub max_capacity: u64,
@@ -19,6 +24,23 @@ pub struct Cache {
 	pub time_to_live: Duration,
 	#[serde(with = "humantime_serde", default = "default_cache_duration")]
 	pub time_to_idle: Duration,
+	pub refresh_interval: Option<Duration>,
+}
+
+fn validate_cache_config(cfg: &Cache) -> Result<(), ValidationError> {
+	if cfg.time_to_idle > cfg.time_to_live {
+		return Err(ValidationError::new(
+			"time_to_idle must be no greater than time_to_live",
+		));
+	}
+	if let Some(interval) = cfg.refresh_interval {
+		if interval + Duration::from_secs(60) > cfg.time_to_live {
+			return Err(ValidationError::new(
+				"refresh_interval + 60s must be no greater than time_to_live",
+			));
+		}
+	}
+	Ok(())
 }
 
 const fn default_cache() -> Cache {
@@ -26,6 +48,7 @@ const fn default_cache() -> Cache {
 		max_capacity: default_cache_max_capacity(),
 		time_to_live: default_cache_duration(),
 		time_to_idle: default_cache_duration(),
+		refresh_interval: None,
 	}
 }
 
@@ -37,22 +60,30 @@ const fn default_cache_duration() -> Duration {
 	Duration::from_secs(2 * 60)
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Validate)]
 pub struct Log {
-	pub level: String,
 	pub file: String,
 	// see https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+	#[validate(custom(function = "validate_log_filter_directives"))]
 	pub filter_directives: String,
 }
 
 impl Default for Log {
 	fn default() -> Self {
 		Self {
-			level: "info".to_string(),
 			file: "info.log".to_string(),
 			filter_directives: "info".to_string(),
 		}
 	}
+}
+
+fn validate_log_filter_directives(
+	dirs: &str,
+) -> Result<(), ValidationError> {
+	Builder::default()
+		.parse(dirs)
+		.map_err(|_| ValidationError::new("invalid log filter directives"))
+		.map(|_| ())
 }
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Debug)]
@@ -184,12 +215,20 @@ impl TryFrom<Databend> for databend_driver::Client {
 	}
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Validate)]
 pub struct Server {
+	#[validate(custom(function = "validate_ip_addr"))]
 	pub listen_addr: String,
 	#[serde(with = "humantime_serde")]
 	pub timeout: Duration,
+	#[validate(nested)]
 	pub log: Log,
+}
+
+fn validate_ip_addr(addr: &str) -> Result<(), ValidationError> {
+	SocketAddr::from_str(addr)
+		.map_err(|_| ValidationError::new("invalid bind address"))
+		.map(|_| ())
 }
 
 impl AppConfig {
@@ -341,5 +380,105 @@ mod tests {
 		assert_eq!(cfg.cache.time_to_live, Duration::from_secs(10 * 60));
 		assert_eq!(cfg.cache.time_to_idle, default_cache_duration());
 		Ok(())
+	}
+
+	#[test]
+	fn test_whole_file_validation() -> anyhow::Result<()> {
+		let cfg: AppConfig = Config::builder()
+			.add_source(File::with_name("./config.yaml"))
+			.build()?
+			.try_deserialize()?;
+		cfg.validate()?;
+		Ok(())
+	}
+
+	#[test]
+	fn test_cache_config_validate() {
+		let test_cases = vec![
+			(
+				Cache {
+					max_capacity: default_cache_max_capacity(),
+					time_to_live: Duration::from_secs(10 * 60),
+					time_to_idle: default_cache_duration(),
+					refresh_interval: Some(Duration::from_secs(580)),
+				},
+				1,
+			),
+			(
+				Cache {
+					max_capacity: default_cache_max_capacity(),
+					time_to_live: Duration::from_secs(10 * 60),
+					time_to_idle: default_cache_duration(),
+					refresh_interval: Some(Duration::from_secs(9 * 60)),
+				},
+				0,
+			),
+			(
+				Cache {
+					max_capacity: default_cache_max_capacity(),
+					time_to_live: Duration::from_secs(10 * 60),
+					time_to_idle: default_cache_duration(),
+					refresh_interval: None,
+				},
+				0,
+			),
+		];
+		for (i, (input, expect)) in test_cases.into_iter().enumerate() {
+			let actual = input.validate();
+			if expect > 0 {
+				assert!(actual.is_err(), "case {}", i);
+			} else {
+				assert!(actual.is_ok(), "case {}", i);
+			}
+		}
+	}
+
+	#[test]
+	fn test_server_config_validate() {
+		let test_cases = vec![
+			(
+				Server {
+					listen_addr: "0.0.0.0:6778".to_string(),
+					timeout: Duration::from_secs(30),
+					log: Log::default(),
+				},
+				0,
+			),
+			(
+				Server {
+					listen_addr: ":6778".to_string(),
+					timeout: Duration::from_secs(30),
+					log: Log::default(),
+				},
+				1,
+			),
+			(
+				Server {
+					listen_addr: "0.0.0.0".to_string(),
+					timeout: Duration::from_secs(30),
+					log: Log::default(),
+				},
+				1,
+			),
+			(
+				Server {
+					listen_addr: "0.0.0.0:6778".to_string(),
+					timeout: Duration::from_secs(30),
+					log: Log {
+						file: "info.log".to_string(),
+						filter_directives: "wtf,,;asd".to_string(),
+					},
+				},
+				1,
+			),
+		];
+		for (i, (input, expect)) in test_cases.into_iter().enumerate() {
+			let actual = input.validate();
+			if expect > 0 {
+				assert!(actual.is_err(), "case {}", i);
+			} else {
+				assert!(actual.is_ok(), "case {}, err: {:?}", i, actual);
+			}
+		}
 	}
 }
