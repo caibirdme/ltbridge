@@ -8,6 +8,7 @@ use thiserror::Error;
 use traceql::TraceQLError;
 
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum AppError {
 	#[error("Invalid logql: {0}")]
 	InvalidLogQL(#[from] LogQLParseError),

@@ -8,27 +8,30 @@ use axum::{
 };
 use common::TimeRange;
 use logql::parser;
-use moka::sync::Cache;
-use tracing::debug;
-
+use moka::{sync::Cache, Expiry};
+use tokio::time::{interval_at, Instant};
+use tracing::{debug, error};
 // since tag key and value of any services may contain '/' '-' '|' ...
 // we use '---' '|||' to split them
 const KEY_SPLITER: &str = "---";
 const PAIR_SPLITER: &str = "|||";
+const SERIES_CACHE_KEY: &str = "srs";
+const LABELS_CACHE_KEY: &str = "lbs";
+const LABEL_VALUES_CACHE_KEY_PREFIX: &str = "lbvs:";
 
 pub async fn query_labels(
 	State(state): State<AppState>,
-	Query(req): Query<QueryLabelsRequest>,
+	_: Query<QueryLabelsRequest>,
 ) -> Result<QueryLabelsResponse, AppError> {
 	let cache = state.cache;
-	if let Some(c) = cache.get(label_cache_key()) {
+	if let Some(c) = cache.get(LABELS_CACHE_KEY) {
 		return Ok(serde_json::from_slice(&c).unwrap());
 	}
 	let labels = state
 		.log_handle
 		.labels(QueryLimits {
 			limit: None,
-			range: time_range_less_in_a_day(req.start, req.end),
+			range: t_hours_before(2),
 			direction: None,
 			step: None,
 		})
@@ -40,50 +43,31 @@ pub async fn query_labels(
 	};
 	if should_cache {
 		let d = serde_json::to_vec(&resp).unwrap();
-		cache.insert(label_cache_key().to_string(), Arc::new(d));
+		cache.insert(LABELS_CACHE_KEY.to_string(), Arc::new(d));
 	}
 	Ok(resp)
 }
 
-fn time_range_less_in_a_day(
-	start: Option<LokiDate>,
-	_: Option<LokiDate>,
-) -> TimeRange {
-	let two_hour_before = Utc::now() - Duration::from_secs(2 * 60 * 60);
-	let start = start.or(Some(LokiDate(two_hour_before))).map(|d| {
-		let d = d.0;
-		if d > two_hour_before {
-			d
-		} else {
-			two_hour_before
-		}
-	});
+fn t_hours_before(hours: u64) -> TimeRange {
+	let start = Utc::now() - Duration::from_secs(hours * 60 * 60);
 	TimeRange {
-		start: start.map(|v| v.naive_utc()),
+		start: Some(start.naive_utc()),
 		end: None,
 	}
 }
 
-const fn label_cache_key() -> &'static str {
-	"cc:labels"
-}
-
 fn label_values_cache_key(k: &str) -> String {
-	format!("cc:label_values:{}", k)
-}
-
-fn series_cache_key() -> String {
-	"cc:series:".to_string()
+	LABEL_VALUES_CACHE_KEY_PREFIX.to_string() + k
 }
 
 fn series_cache_key_with_matches(matches: &str) -> String {
-	series_cache_key() + KEY_SPLITER + matches
+	SERIES_CACHE_KEY.to_string() + KEY_SPLITER + matches
 }
 
 pub async fn query_label_values(
 	State(state): State<AppState>,
 	Path(label): Path<String>,
-	Query(req): Query<QueryLabelValuesRequest>,
+	_: Query<QueryLabelValuesRequest>,
 ) -> Result<QueryLabelsResponse, AppError> {
 	let cache = state.cache;
 	let cache_key = label_values_cache_key(&label);
@@ -98,7 +82,7 @@ pub async fn query_label_values(
 			&label,
 			QueryLimits {
 				limit: None,
-				range: time_range_less_in_a_day(req.start, req.end),
+				range: t_hours_before(2),
 				direction: None,
 				step: None,
 			},
@@ -171,7 +155,7 @@ pub async fn query_series(
 		debug!("use longest prefix cache: {}", v);
 		(*v).clone()
 	} else {
-		series_cache_key()
+		SERIES_CACHE_KEY.to_string()
 	};
 	let mut values = if let Some(v) = state.cache.get(&cache_key) {
 		serde_json::from_slice(&v).unwrap()
@@ -187,7 +171,7 @@ pub async fn query_series(
 				None,
 				QueryLimits {
 					limit: None,
-					range: time_range_less_in_a_day(req.start, req.end),
+					range: t_hours_before(2),
 					direction: None,
 					step: None,
 				},
@@ -196,7 +180,9 @@ pub async fn query_series(
 		// cache result to avoid O(n!)
 		if !v.is_empty() {
 			let d = serde_json::to_vec(&v).unwrap();
-			state.cache.insert(series_cache_key(), Arc::new(d));
+			state
+				.cache
+				.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
 			let v2 = convert_vec_hashmap(&v);
 			cache_values(&state.cache, &v2);
 		}
@@ -224,6 +210,44 @@ pub async fn query_series(
 		status: ResponseStatus::Success,
 		data: values,
 	}))
+}
+
+pub async fn background_refresh_series_cache(
+	state: AppState,
+	interval: Duration,
+) {
+	// run every interval
+	let mut ticker = interval_at(Instant::now(), interval);
+	loop {
+		ticker.tick().await;
+		debug!("refresh series cache");
+		let v = state
+			.log_handle
+			.series(
+				None,
+				QueryLimits {
+					limit: None,
+					range: t_hours_before(2),
+					direction: None,
+					step: None,
+				},
+			)
+			.await;
+		match v {
+			Ok(v) => {
+				debug!("refresh series cache success, len: {}", v.len());
+				// convert vec<hashmap<string, string>> to json will always success
+				// so we just unwrap here
+				let d = serde_json::to_vec(&v).unwrap();
+				state
+					.cache
+					.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
+				let v2 = convert_vec_hashmap(&v);
+				cache_values(&state.cache, &v2);
+			}
+			Err(e) => error!("failed to refresh series cache: {}", e),
+		}
+	}
 }
 
 // using_key is the cache key that we are using, cache_key_with_matches is the full key
@@ -390,6 +414,32 @@ fn convert_vec_hashmap(
 struct CacheLabelResponse<'a> {
 	pub status: ResponseStatus,
 	pub data: &'a Vec<&'a String>,
+}
+
+// extend the cache expiry time when the key is updated
+pub struct LabelCacheExpiry {
+	pub extend_when_update: Duration,
+}
+
+impl Expiry<String, Arc<Vec<u8>>> for LabelCacheExpiry {
+	fn expire_after_update(
+		&self,
+		key: &String,
+		_value: &Arc<Vec<u8>>,
+		_updated_at: std::time::Instant,
+		duration_until_expiry: Option<Duration>,
+	) -> Option<Duration> {
+		if !key.eq(SERIES_CACHE_KEY)
+			&& !key.starts_with(LABEL_VALUES_CACHE_KEY_PREFIX)
+		{
+			return duration_until_expiry;
+		}
+		if let Some(d) = duration_until_expiry {
+			Some(std::cmp::max(d, self.extend_when_update))
+		} else {
+			Some(self.extend_when_update)
+		}
+	}
 }
 
 #[cfg(test)]

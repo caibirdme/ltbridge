@@ -1,5 +1,7 @@
 use crate::{
-	config, metrics,
+	config,
+	logquery::labels::LabelCacheExpiry,
+	metrics,
 	storage::{log::LogStorage, trace::TraceStorage},
 };
 use moka::sync::Cache;
@@ -12,4 +14,14 @@ pub struct AppState {
 	pub trace_handle: Box<dyn TraceStorage>,
 	pub cache: Cache<String, Arc<Vec<u8>>>,
 	pub metrics: Arc<metrics::Instrumentations>,
+}
+
+pub fn new_cache(cfg: &config::Cache) -> Cache<String, Arc<Vec<u8>>> {
+	Cache::builder()
+		// automatically extend the cache expiry time when the key is updated
+		.expire_after(LabelCacheExpiry{extend_when_update: cfg.time_to_live})
+		.max_capacity(cfg.max_capacity)
+		.time_to_live(cfg.time_to_live)
+		.time_to_idle(cfg.time_to_idle)
+		.build()
 }
