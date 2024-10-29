@@ -30,6 +30,12 @@ pub enum AppError {
 	InvalidQueryString(String),
 	#[error("Trace not found")]
 	TraceNotFound,
+	#[error("IO error: {0}")]
+	IOError(#[from] std::io::Error),
+	#[error("Rmp error: {0}")]
+	RmpDecodeError(#[from] rmp_serde::decode::Error),
+	#[error("Rmp encode error: {0}")]
+	RmpEncodeError(#[from] rmp_serde::encode::Error),
 }
 
 impl IntoResponse for AppError {
@@ -83,6 +89,21 @@ impl IntoResponse for AppError {
 				(StatusCode::NOT_FOUND, "Trace not found".to_string())
 					.into_response()
 			}
+			AppError::IOError(e) => (
+				StatusCode::INTERNAL_SERVER_ERROR,
+				format!("IO error: {}", e),
+			)
+				.into_response(),
+			AppError::RmpDecodeError(e) => (
+				StatusCode::INTERNAL_SERVER_ERROR,
+				format!("Rmp decode error: {}", e),
+			)
+				.into_response(),
+			AppError::RmpEncodeError(e) => (
+				StatusCode::INTERNAL_SERVER_ERROR,
+				format!("Rmp encode error: {}", e),
+			)
+				.into_response(),
 		}
 	}
 }
