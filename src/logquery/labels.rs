@@ -7,10 +7,10 @@ use axum::{
 	Json,
 };
 use common::TimeRange;
-use de::DeserializeOwned;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use logql::parser;
 use moka::{sync::Cache, Expiry};
+use serde::de::DeserializeOwned;
 use tokio::time::{interval_at, Instant};
 use tracing::{debug, error};
 
@@ -28,7 +28,7 @@ pub async fn query_labels(
 ) -> Result<QueryLabelsResponse, AppError> {
 	let cache = state.cache;
 	if let Some(c) = cache.get(LABELS_CACHE_KEY) {
-		return Ok(deserialize_from_slice(&c).unwrap());
+		return Ok(deserialize_from_slice(&c)?);
 	}
 	let labels = state
 		.log_handle
@@ -45,7 +45,7 @@ pub async fn query_labels(
 		data: labels,
 	};
 	if should_cache {
-		let d = serialize_to_vec(&resp).unwrap();
+		let d = serialize_to_vec(&resp)?;
 		cache.insert(LABELS_CACHE_KEY.to_string(), Arc::new(d));
 	}
 	Ok(resp)
@@ -76,7 +76,7 @@ pub async fn query_label_values(
 	let cache_key = label_values_cache_key(&label);
 	if let Some(c) = cache.get(&cache_key) {
 		debug!("hit cache for label values: {}", cache_key);
-		return Ok(deserialize_from_slice(&c).unwrap());
+		return Ok(deserialize_from_slice(&c)?);
 	}
 	debug!("miss cache for label values: {}", cache_key);
 	let values = state
@@ -97,7 +97,7 @@ pub async fn query_label_values(
 		data: values,
 	};
 	if should_cache {
-		let d = serialize_to_vec(&resp).unwrap();
+		let d = serialize_to_vec(&resp)?;
 		cache.insert(cache_key, Arc::new(d));
 	}
 	Ok(resp)
@@ -132,7 +132,7 @@ pub async fn query_series(
 		debug!("hit cache for series: {}", cache_key_with_matches);
 		return Ok(Json(QuerySeriesResponse {
 			status: ResponseStatus::Success,
-			data: deserialize_from_slice(&v).unwrap(),
+			data: deserialize_from_slice(&v)?,
 		}));
 	}
 	debug!("miss cache for series: {}", cache_key_with_matches);
@@ -161,7 +161,7 @@ pub async fn query_series(
 		SERIES_CACHE_KEY.to_string()
 	};
 	let mut values = if let Some(v) = state.cache.get(&cache_key) {
-		deserialize_from_slice(&v).unwrap()
+		deserialize_from_slice(&v)?
 	} else {
 		debug!(
 			"no cache hit, very slow path, O(n!), cache_key: {}",
@@ -182,7 +182,7 @@ pub async fn query_series(
 			.await?;
 		// cache result to avoid O(n!)
 		if !v.is_empty() {
-			let d = serialize_to_vec(&v).unwrap();
+			let d = serialize_to_vec(&v)?;
 			state
 				.cache
 				.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
@@ -206,7 +206,7 @@ pub async fn query_series(
 	}
 
 	if !values.is_empty() && !rest_label_pairs.is_empty() {
-		let d = serialize_to_vec(&values).unwrap();
+		let d = serialize_to_vec(&values)?;
 		state.cache.insert(cache_key_with_matches, Arc::new(d));
 	}
 	Ok(Json(QuerySeriesResponse {
@@ -241,12 +241,13 @@ pub async fn background_refresh_series_cache(
 				debug!("refresh series cache success, len: {}", v.len());
 				// convert vec<hashmap<string, string>> to json will always success
 				// so we just unwrap here
-				let d = serialize_to_vec(&v).unwrap();
-				state
-					.cache
-					.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
-				let v2 = convert_vec_hashmap(&v);
-				cache_values(&state.cache, &v2);
+				if let Ok(d) = serialize_to_vec(&v) {
+					state
+						.cache
+						.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
+					let v2 = convert_vec_hashmap(&v);
+					cache_values(&state.cache, &v2);
+				}
 			}
 			Err(e) => error!("failed to refresh series cache: {}", e),
 		}
@@ -394,8 +395,9 @@ fn cache_values(
 			status: ResponseStatus::Success,
 			data: v,
 		};
-		let d = serialize_to_vec(&resp).unwrap();
-		cache.insert(key, Arc::new(d));
+		if let Ok(d) = serialize_to_vec(&resp) {
+			cache.insert(key, Arc::new(d));
+		}
 	}
 }
 
@@ -614,7 +616,10 @@ mod tests {
 			("uuuuuuuuuuuuuuuuuuu", "vvvvvvvvvvvvvvvvvvv"),
 			("wwwwwwwwwwwwwwwwwww", "xxxxxxxxxxxxxxxxxxx"),
 			("yyyyyyyyyyyyyyyyyyy", "zzzzzzzzzzzzzzzzzzz"),
-		].into_iter().map(|(k,v)| (k.to_string(), v.to_string())).collect();
+		]
+		.into_iter()
+		.map(|(k, v)| (k.to_string(), v.to_string()))
+		.collect();
 		let d = serialize_to_vec(&m).unwrap();
 		let m2 = deserialize_from_slice::<HashMap<String, String>>(&d).unwrap();
 		assert_eq!(m, m2);
