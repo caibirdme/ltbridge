@@ -28,7 +28,7 @@ pub async fn query_labels(
 ) -> Result<QueryLabelsResponse, AppError> {
 	let cache = state.cache;
 	if let Some(c) = cache.get(LABELS_CACHE_KEY) {
-		return Ok(deserialize_from_slice(&c)?);
+		return deserialize_from_slice(&c);
 	}
 	let labels = state
 		.log_handle
@@ -76,7 +76,7 @@ pub async fn query_label_values(
 	let cache_key = label_values_cache_key(&label);
 	if let Some(c) = cache.get(&cache_key) {
 		debug!("hit cache for label values: {}", cache_key);
-		return Ok(deserialize_from_slice(&c)?);
+		return deserialize_from_slice(&c);
 	}
 	debug!("miss cache for label values: {}", cache_key);
 	let values = state
