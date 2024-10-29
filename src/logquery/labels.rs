@@ -7,10 +7,13 @@ use axum::{
 	Json,
 };
 use common::TimeRange;
+use de::DeserializeOwned;
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use logql::parser;
 use moka::{sync::Cache, Expiry};
 use tokio::time::{interval_at, Instant};
 use tracing::{debug, error};
+
 // since tag key and value of any services may contain '/' '-' '|' ...
 // we use '---' '|||' to split them
 const KEY_SPLITER: &str = "---";
@@ -25,7 +28,7 @@ pub async fn query_labels(
 ) -> Result<QueryLabelsResponse, AppError> {
 	let cache = state.cache;
 	if let Some(c) = cache.get(LABELS_CACHE_KEY) {
-		return Ok(serde_json::from_slice(&c).unwrap());
+		return Ok(deserialize_from_slice(&c).unwrap());
 	}
 	let labels = state
 		.log_handle
@@ -42,7 +45,7 @@ pub async fn query_labels(
 		data: labels,
 	};
 	if should_cache {
-		let d = serde_json::to_vec(&resp).unwrap();
+		let d = serialize_to_vec(&resp).unwrap();
 		cache.insert(LABELS_CACHE_KEY.to_string(), Arc::new(d));
 	}
 	Ok(resp)
@@ -73,7 +76,7 @@ pub async fn query_label_values(
 	let cache_key = label_values_cache_key(&label);
 	if let Some(c) = cache.get(&cache_key) {
 		debug!("hit cache for label values: {}", cache_key);
-		return Ok(serde_json::from_slice(&c).unwrap());
+		return Ok(deserialize_from_slice(&c).unwrap());
 	}
 	debug!("miss cache for label values: {}", cache_key);
 	let values = state
@@ -94,7 +97,7 @@ pub async fn query_label_values(
 		data: values,
 	};
 	if should_cache {
-		let d = serde_json::to_vec(&resp).unwrap();
+		let d = serialize_to_vec(&resp).unwrap();
 		cache.insert(cache_key, Arc::new(d));
 	}
 	Ok(resp)
@@ -129,7 +132,7 @@ pub async fn query_series(
 		debug!("hit cache for series: {}", cache_key_with_matches);
 		return Ok(Json(QuerySeriesResponse {
 			status: ResponseStatus::Success,
-			data: serde_json::from_slice(&v).unwrap(),
+			data: deserialize_from_slice(&v).unwrap(),
 		}));
 	}
 	debug!("miss cache for series: {}", cache_key_with_matches);
@@ -158,7 +161,7 @@ pub async fn query_series(
 		SERIES_CACHE_KEY.to_string()
 	};
 	let mut values = if let Some(v) = state.cache.get(&cache_key) {
-		serde_json::from_slice(&v).unwrap()
+		deserialize_from_slice(&v).unwrap()
 	} else {
 		debug!(
 			"no cache hit, very slow path, O(n!), cache_key: {}",
@@ -179,7 +182,7 @@ pub async fn query_series(
 			.await?;
 		// cache result to avoid O(n!)
 		if !v.is_empty() {
-			let d = serde_json::to_vec(&v).unwrap();
+			let d = serialize_to_vec(&v).unwrap();
 			state
 				.cache
 				.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
@@ -203,7 +206,7 @@ pub async fn query_series(
 	}
 
 	if !values.is_empty() && !rest_label_pairs.is_empty() {
-		let d = serde_json::to_vec(&values).unwrap();
+		let d = serialize_to_vec(&values).unwrap();
 		state.cache.insert(cache_key_with_matches, Arc::new(d));
 	}
 	Ok(Json(QuerySeriesResponse {
@@ -238,7 +241,7 @@ pub async fn background_refresh_series_cache(
 				debug!("refresh series cache success, len: {}", v.len());
 				// convert vec<hashmap<string, string>> to json will always success
 				// so we just unwrap here
-				let d = serde_json::to_vec(&v).unwrap();
+				let d = serialize_to_vec(&v).unwrap();
 				state
 					.cache
 					.insert(SERIES_CACHE_KEY.to_string(), Arc::new(d));
@@ -391,7 +394,7 @@ fn cache_values(
 			status: ResponseStatus::Success,
 			data: v,
 		};
-		let d = serde_json::to_vec(&resp).unwrap();
+		let d = serialize_to_vec(&resp).unwrap();
 		cache.insert(key, Arc::new(d));
 	}
 }
@@ -408,6 +411,27 @@ fn convert_vec_hashmap(
 	}
 
 	result
+}
+
+fn serialize_to_vec<T: ?Sized + Serialize>(v: &T) -> Result<Vec<u8>, AppError> {
+	use std::io::Write;
+	rmp_serde::to_vec(v).map_err(AppError::from).and_then(|v| {
+		let mut buf = Vec::new();
+		let mut enc = GzEncoder::new(&mut buf, Compression::default());
+		enc.write_all(&v)?;
+		enc.finish()?;
+		Ok(buf)
+	})
+}
+
+fn deserialize_from_slice<T: DeserializeOwned>(
+	v: &[u8],
+) -> Result<T, AppError> {
+	use std::io::Read;
+	let mut dec = GzDecoder::new(v);
+	let mut buf = Vec::new();
+	dec.read_to_end(&mut buf)?;
+	rmp_serde::from_read(buf.as_slice()).map_err(AppError::from)
 }
 
 #[derive(Serialize, Debug)]
@@ -572,5 +596,27 @@ mod tests {
 			let actual = canonicalize_matches(&matches);
 			assert_eq!(actual, expected);
 		}
+	}
+
+	#[test]
+	fn test_serialize_and_deserialize() {
+		let m: HashMap<String, String> = vec![
+			("aaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbb"),
+			("ccccccccccccccccccc", "ddddddddddddddddddd"),
+			("eeeeeeeeeeeeeeeeeee", "fffffffffffffffffff"),
+			("ggggggggggggggggggg", "hhhhhhhhhhhhhhhhhhh"),
+			("iiiiiiiiiiiiiiiiiii", "jjjjjjjjjjjjjjjjjjj"),
+			("kkkkkkkkkkkkkkkkkkk", "lllllllllllllllllll"),
+			("mmmmmmmmmmmmmmmmmmm", "nnnnnnnnnnnnnnnnnnn"),
+			("ooooooooooooooooooo", "ppppppppppppppppppp"),
+			("qqqqqqqqqqqqqqqqqqq", "rrrrrrrrrrrrrrrrrrr"),
+			("sssssssssssssssssss", "ttttttttttttttttttt"),
+			("uuuuuuuuuuuuuuuuuuu", "vvvvvvvvvvvvvvvvvvv"),
+			("wwwwwwwwwwwwwwwwwww", "xxxxxxxxxxxxxxxxxxx"),
+			("yyyyyyyyyyyyyyyyyyy", "zzzzzzzzzzzzzzzzzzz"),
+		].into_iter().map(|(k,v)| (k.to_string(), v.to_string())).collect();
+		let d = serialize_to_vec(&m).unwrap();
+		let m2 = deserialize_from_slice::<HashMap<String, String>>(&d).unwrap();
+		assert_eq!(m, m2);
 	}
 }

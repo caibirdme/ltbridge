@@ -54,7 +54,8 @@ const fn default_cache() -> Cache {
 }
 
 const fn default_cache_max_capacity() -> u64 {
-	100000
+	// 1GB
+	1024 * 1024 * 1024
 }
 
 const fn default_cache_duration() -> Duration {
