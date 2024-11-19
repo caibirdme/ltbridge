@@ -65,7 +65,7 @@ thiserror = { version = "2.0.3" }
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = { version = "0.1.16" }
 tower = { version = "0.5.1" }
-tower-http = { version = "0.6.1", features = [
+tower-http = { version = "0.6.2", features = [
     "trace",
     "timeout",
     "compression-gzip",
