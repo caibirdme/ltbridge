@@ -1757,7 +1757,7 @@ dependencies = [
  "lazy_static",
  "logql",
  "moka",
- "opentelemetry",
+ "opentelemetry 0.27.0",
  "opentelemetry-prometheus",
  "opentelemetry-proto",
  "opentelemetry-semantic-conventions",
@@ -2094,13 +2094,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f3cebff57f7dbd1255b44d8bddc2cebeb0ea677dbaa2e25a3070a91b318f660"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "once_cell",
+ "pin-project-lite",
+ "thiserror 1.0.68",
+]
+
+[[package]]
 name = "opentelemetry-prometheus"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc4191ce34aa274621861a7a9d68dbcf618d5b6c66b10081631b61fd81fbc015"
 dependencies = [
  "once_cell",
- "opentelemetry",
+ "opentelemetry 0.24.0",
  "opentelemetry_sdk",
  "prometheus",
  "protobuf",
@@ -2113,7 +2127,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30ee9f20bff9c984511a02f082dc8ede839e4a9bf15cc2487c8d6fea5ad850d9"
 dependencies = [
  "hex",
- "opentelemetry",
+ "opentelemetry 0.24.0",
  "opentelemetry_sdk",
  "prost",
  "serde",
@@ -2138,7 +2152,7 @@ dependencies = [
  "futures-util",
  "glob",
  "once_cell",
- "opentelemetry",
+ "opentelemetry 0.24.0",
  "percent-encoding",
  "rand",
  "serde_json",

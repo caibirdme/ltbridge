@@ -45,7 +45,7 @@ itertools = { version = "0.13.0" }
 lazy_static = "1.5.0"
 logql = { path = "logql" }
 moka = { version = "0.12.8", features = ["default", "sync"] }
-opentelemetry = { version = "0.24.0", features = ["metrics"] }
+opentelemetry = { version = "0.27.0", features = ["metrics"] }
 opentelemetry-prometheus = "0.17.0"
 opentelemetry-proto = { workspace = true }
 opentelemetry-semantic-conventions = { version = "0.25.0" }
