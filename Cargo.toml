@@ -74,7 +74,7 @@ tower-http = { version = "0.6.2", features = [
 tower-layer = { version = "0.3.3" }
 traceql = { path = "traceql" }
 tracing = { version = "0.1.41" }
-tracing-subscriber = { version = "0.3.18", features = [
+tracing-subscriber = { version = "0.3.19", features = [
     "default",
     "env-filter",
     "json",
