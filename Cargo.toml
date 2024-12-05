@@ -35,7 +35,7 @@ chrono = { workspace = true }
 common = { path = "common" }
 config = { version = "0.14.1" }
 dashmap = "6.1.0"
-databend-driver = { version = "0.23.2" }
+databend-driver = { version = "0.24.2" }
 dyn-clone = "1.0.17"
 flate2 = "1.0.35"
 hex = { version = "0.4.3" }
