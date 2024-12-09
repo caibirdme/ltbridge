@@ -52,7 +52,7 @@ opentelemetry-semantic-conventions = { version = "0.25.0" }
 opentelemetry_sdk = { version = "0.24.1", features = ["metrics"] }
 ordered-float = { version = "4.5.0" }
 prometheus = "0.13.4"
-prost = { version = "0.13.3" }
+prost = { version = "0.13.4" }
 regex = "1.11.1"
 reqwest = { version = "0.12.9", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 reqwest-middleware = "0.4.0"
