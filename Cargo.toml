@@ -57,7 +57,7 @@ regex = "1.11.1"
 reqwest = { version = "0.12.9", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
 reqwest-middleware = "0.4.0"
 rmp-serde = "1.3.0"
-serde = { version = "1.0.214", features = ["derive"] }
+serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.133" }
 serde_with = { version = "3.11.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
