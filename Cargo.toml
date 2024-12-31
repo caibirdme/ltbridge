@@ -18,7 +18,7 @@ members = [
 [workspace.dependencies]
 nom ={ version = "7.1.3" }
 humantime-serde = { version = "1.1.1" }
-itertools = { version = "0.13.0" }
+itertools = { version = "0.14.0" }
 ordered-float = { version = "4.6.0" }
 humantime = { version = "2.1.0" }
 chrono = { version = "0.4.39", features = ["serde"] }
@@ -41,7 +41,7 @@ flate2 = "1.0.35"
 hex = { version = "0.4.3" }
 http = "1.2.0"
 humantime-serde = { version = "1.1.1" }
-itertools = { version = "0.13.0" }
+itertools = { version = "0.14.0" }
 lazy_static = "1.5.0"
 logql = { path = "logql" }
 moka = { version = "0.12.8", features = ["default", "sync"] }
