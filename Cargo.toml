@@ -27,7 +27,7 @@ opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 
 [dependencies]
 anyhow = "1.0.95"
-async-trait = "0.1.83"
+async-trait = "0.1.85"
 axum = { version = "0.7.9", features = ["default"] }
 axum-valid = "0.20.0"
 bytes = "1.9.0"
