@@ -5,7 +5,6 @@ use crate::{
 	storage::log::{LogItem, MetricItem},
 };
 use axum::extract::{Query, State};
-use axum_valid::Valid;
 use itertools::Itertools;
 use logql::parser;
 use moka::sync::Cache;
@@ -13,8 +12,9 @@ use std::{collections::HashMap, sync::Arc};
 
 pub async fn query_range(
 	State(state): State<AppState>,
-	Valid(Query(req)): Valid<Query<QueryRangeRequest>>,
+	Query(req): Query<QueryRangeRequest>,
 ) -> Result<QueryRangeResponse, AppError> {
+	req.validate()?;
 	let cache_key = serde_json::to_string(&req).unwrap();
 	if let Some(resp) = get_cached_query(&cache_key, state.cache.clone()) {
 		return Ok(resp);
