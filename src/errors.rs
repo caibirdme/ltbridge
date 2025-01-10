@@ -107,11 +107,10 @@ impl IntoResponse for AppError {
 				format!("Rmp encode error: {}", e),
 			)
 				.into_response(),
-			AppError::ValidationError(e) => (
-				StatusCode::BAD_REQUEST,
-				format!("Validation error: {}", e),
-			)
-				.into_response(),
+			AppError::ValidationError(e) => {
+				(StatusCode::BAD_REQUEST, format!("Validation error: {}", e))
+					.into_response()
+			}
 		}
 	}
 }
