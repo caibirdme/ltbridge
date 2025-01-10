@@ -301,8 +301,6 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "tokio",
- "zstd",
- "zstd-safe",
 ]
 
 [[package]]
@@ -541,8 +539,6 @@ version = "1.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a012a0df96dd6d06ba9a1b29d6402d1a5d77c6befd2566afdc26e10603dc93d7"
 dependencies = [
- "jobserver",
- "libc",
  "shlex",
 ]
 
@@ -804,9 +800,9 @@ dependencies = [
 
 [[package]]
 name = "databend-client"
-version = "0.23.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a82ae5d46af95dcc2d737b1357aa999f43f2aafc354a390eb757b2117602aa1d"
+checksum = "7309461576c2a14f2294e3be2a87a668659cf517d67c964e93fcaf4ee318aaaf"
 dependencies = [
  "cookie",
  "log",
@@ -826,19 +822,17 @@ dependencies = [
 
 [[package]]
 name = "databend-driver"
-version = "0.23.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c0634c1122ae35b034ec317fb97b7f4261652e64d0f89e6a0b14ae56e3ff0f8"
+checksum = "eab324a2e1914a53988224f9746b7b36c1a9361b1b21a230797d872954efc5a7"
 dependencies = [
  "arrow",
- "async-compression",
  "async-trait",
  "chrono",
  "csv",
  "databend-client",
  "databend-driver-core",
  "databend-driver-macros",
- "dyn-clone",
  "glob",
  "log",
  "once_cell",
@@ -851,9 +845,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver-core"
-version = "0.23.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb5168d079af2b2017a254586cba4915a2b3d9081e61d3f044211f6fbc439c0a"
+checksum = "b3740645da946cb9215b0ec0aa3621b9254267246cb982befdaa1d90cb72f558"
 dependencies = [
  "arrow",
  "chrono",
@@ -874,9 +868,9 @@ dependencies = [
 
 [[package]]
 name = "databend-driver-macros"
-version = "0.23.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de618f780c3ea8bbfa69e004f7f669765ec9eefdbfa9af9adb5f4bd18277061e"
+checksum = "168e42e0e95dbfdff9b5f9311d56e22da54bbf0842bc5015db8b669fe78f65c7"
 dependencies = [
  "quote",
  "syn",
@@ -1649,15 +1643,6 @@ name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d75a2a4b1b190afb6f5425f10f6a8f959d2ea0b9c2b1d79553551850539e4674"
-
-[[package]]
-name = "jobserver"
-version = "0.1.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48d1dbcbbeb6a7fec7e059840aa538bd62aaccf972c7346c4d9d2059312853d0"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "js-sys"
@@ -4315,32 +4300,4 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "zstd"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcf2b778a664581e31e389454a7072dab1647606d44f7feea22cd5abb9c9f3f9"
-dependencies = [
- "zstd-safe",
-]
-
-[[package]]
-name = "zstd-safe"
-version = "7.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54a3ab4db68cea366acc5c897c7b4d4d1b8994a9cd6e6f841f8964566a419059"
-dependencies = [
- "zstd-sys",
-]
-
-[[package]]
-name = "zstd-sys"
-version = "2.0.13+zstd.1.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38ff0f21cfee8f97d94cef41359e0c89aa6113028ab0291aa8ca0038995a95aa"
-dependencies = [
- "cc",
- "pkg-config",
 ]

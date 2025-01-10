@@ -2,21 +2,29 @@ use crate::storage::{trace::*, *};
 use anyhow::Result;
 use async_trait::async_trait;
 use databend::converter::DatabendTraceConverter;
-use databend_driver::{Connection, Row, TryFromRow};
+use databend_driver::{Client, Row, TryFromRow};
 use itertools::Itertools;
 use sqlbuilder::builder::*;
 use std::collections::HashMap;
 use tokio_stream::StreamExt;
 use traceql::*;
 
-#[derive(Clone)]
 pub struct BendTraceQuerier {
-	cli: Box<dyn Connection>,
+	cli: Client,
 	schema: TraceTable,
 }
 
+impl Clone for BendTraceQuerier {
+	fn clone(&self) -> Self {
+		Self {
+			cli: self.cli.clone(),
+			schema: self.schema.clone(),
+		}
+	}
+}
+
 impl BendTraceQuerier {
-	pub fn new(cli: Box<dyn Connection>) -> Self {
+	pub fn new_with_client(cli: Client) -> Self {
 		Self {
 			cli,
 			schema: TraceTable::default(),
@@ -40,7 +48,8 @@ impl TraceStorage for BendTraceQuerier {
 		qp.selection = selection;
 		let sql = qp.as_sql();
 		let mut spans = vec![];
-		let mut stream = self.cli.query_iter(&sql).await?;
+		let conn = self.cli.get_conn().await?;
+		let mut stream = conn.query_iter(&sql).await?;
 		while let Some(row) = stream.next().await {
 			let row = row?;
 			let item = row_into_spanitem(row)?;
@@ -56,7 +65,8 @@ impl TraceStorage for BendTraceQuerier {
 	) -> Result<Vec<SpanItem>> {
 		let sql = search_span_sql(expr, &opt, &self.schema);
 		let mut spans = vec![];
-		let mut stream = self.cli.query_iter(&sql).await?;
+		let conn = self.cli.get_conn().await?;
+		let mut stream = conn.query_iter(&sql).await?;
 		while let Some(row) = stream.next().await {
 			let row = row?;
 			let item = row_into_spanitem(row)?;
