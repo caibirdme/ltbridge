@@ -6,7 +6,7 @@ on:
       - master
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -28,11 +28,19 @@ jobs:
       uses: dtolnay/rust-toolchain@1.84.0
       with:
         components: rustfmt, clippy
-    
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
       with:
-        cache-on-failure: true
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
     
     - name: Install cargo-sort
       uses: taiki-e/install-action@cargo-sort
