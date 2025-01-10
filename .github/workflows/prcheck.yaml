@@ -9,33 +9,42 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: 1.82.0
-        profile: minimal
-        override: true
+    - uses: actions/checkout@v4
+    
     - name: Install protoc
-      run: |
-        PB_REL="https://github.com/protocolbuffers/protobuf/releases"
-        curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
-        unzip protoc-25.1-linux-x86_64.zip -d foo
-        sudo mv foo/bin/protoc /usr/local/bin/protoc
-    - name: rust cache
+      uses: arduino/setup-protoc@v2
+      with:
+        version: '25.1'
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@1.82.0
+      with:
+        components: rustfmt, clippy
+    
+    - name: Rust Cache
       uses: Swatinem/rust-cache@v2
-    - name: Install binstall
-      run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-    - name: Install checkers
-      run: cargo binstall -y cargo-sort
-    - name: run checkers
-      run: |
-        cargo sort -c -w
-        cargo fmt -- --check
-        cargo clippy -- -D warnings
-        cargo test
+      with:
+        cache-on-failure: true
+    
+    - name: Install cargo-sort
+      uses: taiki-e/install-action@cargo-sort
+    
+    - name: Check format
+      run: cargo fmt -- --check
+    
+    - name: Check cargo.toml sorting
+      run: cargo sort -c -w
+    
+    - name: Clippy
+      run: cargo clippy --all-features
+    
+    - name: Run tests
+      run: cargo test --all-features
