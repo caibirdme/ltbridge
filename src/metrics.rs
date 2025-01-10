@@ -7,10 +7,10 @@ use axum::{
 };
 use chrono::{TimeDelta, Utc};
 use opentelemetry::{
-	metrics::{Counter, Histogram, MeterProvider as _},
+	metrics::{Counter, Histogram, MeterProvider},
 	KeyValue,
 };
-use opentelemetry_sdk::metrics::{self, SdkMeterProvider};
+use opentelemetry_sdk::metrics::SdkMeterProvider;
 use prometheus::{Encoder, Registry, TextEncoder};
 
 const HTTP_REQUEST_TOTAL_NAME: &str = "http_requests_total";
@@ -63,33 +63,23 @@ pub fn setup_metrcis() -> Instrumentations {
 		.with_registry(registry.clone())
 		.build()
 		.unwrap();
-	let provider = SdkMeterProvider::builder()
-		.with_reader(exporter)
-		.with_view(
-			metrics::new_view(
-				metrics::Instrument::new().name("*_duration_*"),
-				metrics::Stream::new().aggregation(
-					metrics::Aggregation::ExplicitBucketHistogram {
-						boundaries: vec![
-							0.0, 0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 15.0, 30.0,
-						],
-						record_min_max: true,
-					},
-				),
-			)
-			.unwrap(),
-		)
-		.build();
+
+	let provider = SdkMeterProvider::builder().with_reader(exporter).build();
+
 	let meter = provider.meter(env!("CARGO_PKG_NAME"));
+
 	let http_request_total = meter
 		.u64_counter(HTTP_REQUEST_TOTAL_NAME)
 		.with_description("Total number of http requests")
-		.init();
+		.with_unit("")
+		.build();
+
 	let http_request_duration = meter
 		.f64_histogram(HTTP_REQUEST_DURATION_SECONDS)
 		.with_unit("s")
 		.with_description("The HTTP request latencies in seconds")
-		.init();
+		.build();
+
 	Instrumentations {
 		registry,
 		_provider: provider,
