@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use common::LogLevel;
-use databend_driver::{Connection, Row, TryFromRow};
+use databend_driver::{Client, Row, TryFromRow};
 use logql::parser::{LogQuery, MetricQuery};
 use sqlbuilder::builder::*;
 use sqlbuilder::{
@@ -16,19 +16,28 @@ use tokio_stream::StreamExt;
 
 const DEFAULT_STEP: Duration = Duration::from_secs(60);
 
-#[derive(Clone)]
 pub struct BendLogQuerier {
-	cli: Box<dyn Connection>,
+	cli: Client,
 	schema: LogTable,
 }
 
+impl Clone for BendLogQuerier {
+	fn clone(&self) -> Self {
+		Self {
+			cli: self.cli.clone(),
+			schema: self.schema.clone(),
+		}
+	}
+}
+
 impl BendLogQuerier {
-	pub fn new(cli: Box<dyn Connection>) -> Self {
+	pub fn new_with_client(cli: Client) -> Self {
 		Self {
 			cli,
 			schema: LogTable::default(),
 		}
 	}
+
 	pub fn with_inverted_index(&mut self, open: bool) {
 		self.schema.use_inverted_index = open;
 	}
@@ -43,7 +52,8 @@ impl LogStorage for BendLogQuerier {
 	) -> Result<Vec<LogItem>> {
 		let sql = logql_to_sql(q, opt, &self.schema);
 		let mut logs = vec![];
-		let mut stream = self.cli.query_iter(&sql).await?;
+		let conn = self.cli.get_conn().await?;
+		let mut stream = conn.query_iter(&sql).await?;
 		while let Some(row) = stream.next().await {
 			let row = row?;
 			let item = row_into_logitem(row)?;
@@ -60,7 +70,8 @@ impl LogStorage for BendLogQuerier {
 		let selection = v.visit(&q.log_query);
 		let qp = new_from_metricquery(opt, self.schema.clone(), selection);
 		let sql = qp.as_sql();
-		let mut stream = self.cli.query_iter(&sql).await?;
+		let conn = self.cli.get_conn().await?;
+		let mut stream = conn.query_iter(&sql).await?;
 		let mut metrics = vec![];
 		while let Some(row) = stream.next().await {
 			let row = row?;
