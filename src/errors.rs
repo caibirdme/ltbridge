@@ -6,6 +6,7 @@ use databend_driver::Error as DBError;
 use logql::parser::LogQLParseError;
 use thiserror::Error;
 use traceql::TraceQLError;
+use validator::ValidationErrors;
 
 #[derive(Debug, Error)]
 #[allow(dead_code)]
@@ -36,6 +37,8 @@ pub enum AppError {
 	RmpDecodeError(#[from] rmp_serde::decode::Error),
 	#[error("Rmp encode error: {0}")]
 	RmpEncodeError(#[from] rmp_serde::encode::Error),
+	#[error("Validation error: {0}")]
+	ValidationError(#[from] ValidationErrors),
 }
 
 impl IntoResponse for AppError {
@@ -102,6 +105,11 @@ impl IntoResponse for AppError {
 			AppError::RmpEncodeError(e) => (
 				StatusCode::INTERNAL_SERVER_ERROR,
 				format!("Rmp encode error: {}", e),
+			)
+				.into_response(),
+			AppError::ValidationError(e) => (
+				StatusCode::BAD_REQUEST,
+				format!("Validation error: {}", e),
 			)
 				.into_response(),
 		}

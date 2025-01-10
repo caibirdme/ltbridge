@@ -13,7 +13,6 @@ use axum::{
 	extract::{Query, State},
 	Json,
 };
-use axum_valid::Valid;
 use chrono::DateTime;
 use common::TimeRange;
 use itertools::Itertools;
@@ -95,9 +94,10 @@ pub async fn search_tags(
 }
 
 pub async fn search_trace_v2(
-	Valid(Query(req)): Valid<Query<SearchTraceRequest>>,
+	Query(req): Query<SearchTraceRequest>,
 	State(state): State<AppState>,
 ) -> Result<Json<SearchResponse>, AppError> {
+	req.validate()?;
 	let expr = traceql::parse_traceql(&req.q)?;
 	let handle = state.trace_handle;
 	let spans = handle.search_span(&expr, req.into()).await?;
