@@ -12,6 +12,7 @@ members = [
     "common",
     "logql",
     "sqlbuilder",
+    "streamstore",
     "traceql"
 ]
 
@@ -86,7 +87,13 @@ pretty_assertions = { workspace = true }
 serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
 sqlparser = "0.53.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+streamstore = { path = "streamstore" }
 
 [build-dependencies]
 anyhow = "1.0.95"
 prost-build = { version = "0.13.4", features = ["default", "cleanup-markdown"] }
+
+[[bench]]
+name = "streamstore_benchmark"
+harness = false
