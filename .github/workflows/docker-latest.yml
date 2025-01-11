@@ -20,7 +20,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, aarch64-unknown-linux-gnu]
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
       fail-fast: false
     
     steps:
@@ -34,12 +34,6 @@ jobs:
         profile: minimal
         override: true
         target: ${{ matrix.target }}
-
-    - name: Install cross-compilation dependencies
-      if: matrix.target == 'aarch64-unknown-linux-gnu'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
     - name: Cache cargo registry
       uses: actions/cache@v3
@@ -71,11 +65,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
-        platforms: ${{ fromJSON('{"aarch64-unknown-linux-gnu":"linux/arm64","x86_64-unknown-linux-gnu":"linux/amd64","x86_64-unknown-linux-musl":"linux/amd64"}')[matrix.target] }}
-
-    - name: Set up QEMU
-      if: matrix.target == 'aarch64-unknown-linux-gnu'
-      uses: docker/setup-qemu-action@v3
+        platforms: ${{ fromJSON('{"x86_64-unknown-linux-gnu":"linux/amd64","x86_64-unknown-linux-musl":"linux/amd64"}')[matrix.target] }}
 
     - name: Docker Buildx cache
       uses: actions/cache@v3
@@ -97,7 +87,7 @@ jobs:
       with:
         context: .
         push: true
-        platforms: ${{ fromJSON('{"aarch64-unknown-linux-gnu":"linux/arm64","x86_64-unknown-linux-gnu":"linux/amd64","x86_64-unknown-linux-musl":"linux/amd64"}')[matrix.target] }}
+        platforms: ${{ fromJSON('{"x86_64-unknown-linux-gnu":"linux/amd64","x86_64-unknown-linux-musl":"linux/amd64"}')[matrix.target] }}
         tags: ghcr.io/${{ github.repository }}:${{ github.event.inputs.tag }}-${{ matrix.target }}
         file: docker/${{ matrix.target }}/Dockerfile
         cache-from: type=local,src=/tmp/.buildx-cache
