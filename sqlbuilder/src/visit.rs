@@ -22,6 +22,7 @@ impl<T: IRVisitor> LogQLVisitor<T> {
 	pub fn visit(&self, q: &LogQuery) -> Option<Selection> {
 		let mut conds = self.visit_labels(&q.selector.label_paris);
 		conds.extend(self.visit_filters(&q.filters));
+		dbg!("conds is {}", &conds);
 		if conds.is_empty() {
 			None
 		} else {

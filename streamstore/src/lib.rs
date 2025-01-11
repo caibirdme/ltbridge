@@ -44,7 +44,9 @@ pub struct StreamStore {
     // Store the actual content of label combinations
     labels_store: RwLock<HashMap<u64, Labels>>,
     // Inverted index: label name -> label value -> stream hash values
-    label_index: RwLock<HashMap<String, HashMap<String, HashSet<u64>>>>
+    label_index: RwLock<HashMap<String, HashMap<String, HashSet<u64>>>>,
+    // Maximum number of streams allowed, None means unlimited
+    max_streams: Option<usize>,
 }
 
 impl StreamStore {
@@ -53,7 +55,25 @@ impl StreamStore {
             streams: RwLock::new(HashSet::new()),
             labels_store: RwLock::new(HashMap::new()),
             label_index: RwLock::new(HashMap::new()),
+            max_streams: None,
         }
+    }
+
+    pub fn with_max_streams(max_streams: usize) -> Self {
+        Self {
+            streams: RwLock::new(HashSet::new()),
+            labels_store: RwLock::new(HashMap::new()),
+            label_index: RwLock::new(HashMap::new()),
+            max_streams: Some(max_streams),
+        }
+    }
+
+    pub fn get_max_streams(&self) -> Option<usize> {
+        self.max_streams
+    }
+
+    pub fn get_streams_count(&self) -> usize {
+        self.streams.read().unwrap().len()
     }
 }
 
@@ -62,6 +82,18 @@ impl SeriesStore for StreamStore {
         let mut streams = self.streams.write().unwrap();
         let mut labels_store = self.labels_store.write().unwrap();
         let mut label_index = self.label_index.write().unwrap();
+
+        // Check if adding these records would exceed the max_streams limit
+        if let Some(max) = self.max_streams {
+            let new_unique_records = records.iter()
+                .map(|record| Labels::new(record.clone()).hash())
+                .filter(|hash| !streams.contains(hash))
+                .count();
+            
+            if streams.len() + new_unique_records > max {
+                return;
+            }
+        }
 
         for record in records {
             let labels = Labels::new(record);
@@ -522,5 +554,89 @@ mod tests {
         // Test label_values() on empty store
         let values = store.label_values("any");
         assert!(values.is_none());
+    }
+
+    #[test]
+    fn test_max_streams() {
+        // Create store with max 2 streams
+        let store = StreamStore::with_max_streams(2);
+        assert_eq!(store.get_max_streams(), Some(2));
+        assert_eq!(store.get_streams_count(), 0);
+
+        // Add first record - should succeed
+        let record1 = create_labels(&[
+            ("env", "prod"),
+            ("service", "api"),
+        ]);
+        store.add(vec![record1.clone()]);
+        assert_eq!(store.get_streams_count(), 1);
+
+        // Add second record - should succeed
+        let record2 = create_labels(&[
+            ("env", "dev"),
+            ("service", "web"),
+        ]);
+        store.add(vec![record2.clone()]);
+        assert_eq!(store.get_streams_count(), 2);
+
+        // Try to add third record - should fail
+        let record3 = create_labels(&[
+            ("env", "staging"),
+            ("service", "worker"),
+        ]);
+        store.add(vec![record3]);
+        assert_eq!(store.get_streams_count(), 2);
+
+        // Adding duplicate record should succeed (doesn't increase count)
+        store.add(vec![record1.clone()]);
+        assert_eq!(store.get_streams_count(), 2);
+
+        // Adding multiple records where some are new and would exceed limit
+        let records = vec![
+            record1.clone(),  // duplicate
+            record2.clone(),  // duplicate
+            create_labels(&[("env", "test"), ("service", "cache")]),  // new
+        ];
+        store.add(records);
+        assert_eq!(store.get_streams_count(), 2);
+    }
+
+    #[test]
+    fn test_unlimited_streams() {
+        let store = StreamStore::new();
+        assert_eq!(store.get_max_streams(), None);
+
+        // Add many records
+        let mut records = Vec::new();
+        for i in 0..100 {
+            records.push(create_labels(&[
+                ("env", "prod"),
+                ("instance", &i.to_string()),
+            ]));
+        }
+
+        store.add(records);
+        assert_eq!(store.get_streams_count(), 100);
+    }
+
+    #[test]
+    fn test_batch_add_with_limit() {
+        let store = StreamStore::with_max_streams(5);
+        
+        // Create 6 records
+        let records: Vec<_> = (0..6)
+            .map(|i| create_labels(&[
+                ("env", "prod"),
+                ("instance", &i.to_string()),
+            ]))
+            .collect();
+
+        // Try to add all 6 at once - should fail
+        store.add(records.clone());
+        assert_eq!(store.get_streams_count(), 0);
+
+        // Add first 5 records - should succeed
+        store.add(records[0..5].to_vec());
+        assert_eq!(store.get_streams_count(), 5);
     }
 }

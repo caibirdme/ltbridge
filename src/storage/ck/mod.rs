@@ -6,7 +6,6 @@ use std::time::Duration;
 
 pub(crate) mod common;
 pub(crate) mod converter;
-pub(crate) mod labels;
 pub mod log;
 pub mod trace;
 
