@@ -9,7 +9,10 @@ use chrono::Utc;
 use common::TimeRange;
 use logql::parser;
 
-use super::{QueryLabelValuesRequest, QueryLabelsRequest, QueryLabelsResponse, QuerySeriesRequest, QuerySeriesResponse, ResponseStatus};
+use super::{
+	QueryLabelValuesRequest, QueryLabelsRequest, QueryLabelsResponse,
+	QuerySeriesRequest, QuerySeriesResponse, ResponseStatus,
+};
 
 pub async fn query_labels(
 	State(state): State<AppState>,
@@ -79,12 +82,15 @@ pub async fn query_series(
 
 	let series = state
 		.log_handle
-		.series(Some(matches), QueryLimits {
-			limit: None,
-			range: t_hours_before(2),
-			direction: None,
-			step: None,
-		})
+		.series(
+			Some(matches),
+			QueryLimits {
+				limit: None,
+				range: t_hours_before(2),
+				direction: None,
+				step: None,
+			},
+		)
 		.await?;
 
 	Ok(Json(QuerySeriesResponse {
@@ -100,4 +106,3 @@ fn t_hours_before(hours: u64) -> TimeRange {
 		end: None,
 	}
 }
-

@@ -1,7 +1,6 @@
 use super::{common::*, converter::CKLogConverter};
 use crate::config::ClickhouseLog;
 use crate::storage::{log::*, *};
-use streamstore::{StreamStore, SeriesStore};
 use async_trait::async_trait;
 use chrono::DateTime;
 use common::LogLevel;
@@ -16,6 +15,7 @@ use std::{
 	collections::HashMap,
 	sync::{Arc, OnceLock},
 };
+use streamstore::{SeriesStore, StreamStore};
 use tracing::error;
 
 const TRACE_ID_NAME: &str = "trace_id";
@@ -41,7 +41,7 @@ impl CKLogQuerier {
 				ck_cfg.common.database, table
 			)),
 			ck_cfg,
-			meta: Arc::new(StreamStore::new()),
+			meta: StreamStore::new(),
 		}
 	}
 	fn new_converter(&self) -> CKLogConverter<LogTable> {
@@ -155,53 +155,64 @@ impl CKLogQuerier {
 	fn record_label(&self, records: &[LogItem]) {
 		let cfg = self.ck_cfg.label.clone();
 		let mut label_records = Vec::new();
-		
+
 		for record in records {
 			let mut labels = HashMap::new();
 			// Add service name
-			labels.insert("ServiceName".to_string(), record.service_name.clone());
+			labels
+				.insert("ServiceName".to_string(), record.service_name.clone());
 			// Add level
 			labels.insert("level".to_string(), record.level.clone());
-			
+
 			// Add resource attributes
 			if !cfg.resource_attributes.is_empty() {
 				for key in &cfg.resource_attributes {
 					if let Some(value) = record.resource_attributes.get(key) {
-						labels.insert(format!("resources_{}", key), value.clone());
+						labels.insert(
+							format!("resources_{}", key),
+							value.clone(),
+						);
 					}
 				}
 			}
-			
+
 			// Add log attributes
 			if !cfg.log_attributes.is_empty() {
 				for key in &cfg.log_attributes {
 					if let Some(value) = record.log_attributes.get(key) {
-						labels.insert(format!("attributes_{}", key), value.clone());
+						labels.insert(
+							format!("attributes_{}", key),
+							value.clone(),
+						);
 					}
 				}
 			}
-			
+
 			label_records.push(labels);
 		}
-		
+
 		// Batch add all records to StreamStore
 		self.meta.add(label_records);
 	}
 
 	fn selector_to_labels(&self, q: &LogQuery) -> HashMap<String, String> {
-		q.selector.label_paris.iter().filter_map(|v| {
-			if v.op != Operator::Equal || !self.concerned_labels(&v.label) {
-				return None;
-			}
-			Some((v.label.clone(), v.value.clone()))
-		}).collect()
+		q.selector
+			.label_paris
+			.iter()
+			.filter_map(|v| {
+				if v.op != Operator::Equal || !self.concerned_labels(&v.label) {
+					return None;
+				}
+				Some((v.label.clone(), v.value.clone()))
+			})
+			.collect()
 	}
 	fn concerned_labels(&self, label: &String) -> bool {
 		if matches!(label.to_lowercase().as_str(), "service_name" | "level") {
 			return true;
 		}
-		self.ck_cfg.label.resource_attributes.contains(label) || 
-		self.ck_cfg.label.log_attributes.contains(label)
+		self.ck_cfg.label.resource_attributes.contains(label)
+			|| self.ck_cfg.label.log_attributes.contains(label)
 	}
 }
 

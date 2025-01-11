@@ -1,7 +1,30 @@
+use rand::seq::SliceRandom;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+use tokio::time;
+use tracing::{debug, info};
+
+const DEFAULT_MAX_STREAM: u64 = 600000;
+const DEFAULT_CLEANUP_THRESHOLD: u64 = 500000;
+const DEFAULT_CLEANUP_INTERVAL: Duration = Duration::from_secs(300); // 5 minutes
+
+#[derive(Clone)]
+pub struct CleanupConfig {
+	pub cleanup_threshold: u64,
+	pub cleanup_interval: Duration,
+}
+
+impl Default for CleanupConfig {
+	fn default() -> Self {
+		Self {
+			cleanup_threshold: DEFAULT_CLEANUP_THRESHOLD,
+			cleanup_interval: DEFAULT_CLEANUP_INTERVAL,
+		}
+	}
+}
 
 pub trait SeriesStore {
 	fn add(&self, records: Vec<HashMap<String, String>>);
@@ -34,9 +57,7 @@ impl Labels {
 	}
 
 	fn matches(&self, conditions: &HashMap<String, String>) -> bool {
-		conditions
-			.iter()
-			.all(|(k, v)| self.0.get(k).map_or(false, |value| value == v))
+		conditions.iter().all(|(k, v)| self.0.get(k) == Some(v))
 	}
 }
 
@@ -48,15 +69,97 @@ pub struct StreamStore {
 	labels_store: RwLock<HashMap<u64, Labels>>,
 	// Inverted index: label name -> label value -> stream hash values
 	label_index: RwLock<HashMap<String, HashMap<String, HashSet<u64>>>>,
+	// Maximum number of streams allowed
+	max_streams: u64,
 }
 
 impl StreamStore {
-	pub fn new() -> Self {
-		Self {
+	pub fn new() -> Arc<Self> {
+		let store = Self::with_max_streams(DEFAULT_MAX_STREAM);
+		store.start_cleanup_task(CleanupConfig::default());
+		store
+	}
+
+	pub fn with_max_streams(max_streams: u64) -> Arc<Self> {
+		Arc::new(Self {
 			streams: RwLock::new(HashSet::new()),
 			labels_store: RwLock::new(HashMap::new()),
 			label_index: RwLock::new(HashMap::new()),
+			max_streams,
+		})
+	}
+
+	pub fn start_cleanup_task(self: &Arc<Self>, config: CleanupConfig) {
+		let store = Arc::clone(self);
+		tokio::spawn(async move {
+			let mut interval = time::interval(config.cleanup_interval);
+			loop {
+				interval.tick().await;
+				store.cleanup_if_needed(config.cleanup_threshold);
+			}
+		});
+	}
+
+	fn cleanup_if_needed(&self, threshold: u64) {
+		let start_time = Instant::now();
+		let streams = self.streams.read().unwrap();
+		let current_size = streams.len() as u64;
+
+		info!(current_size, threshold, "Checking if cleanup is needed");
+
+		if current_size <= threshold {
+			debug!(
+				current_size,
+				threshold,
+				elapsed_ms = start_time.elapsed().as_millis(),
+				"Cleanup not needed"
+			);
+			return;
 		}
+		drop(streams); // Release the read lock before getting write locks
+
+		// Get write locks for all storage
+		let mut streams = self.streams.write().unwrap();
+		let mut labels_store = self.labels_store.write().unwrap();
+		let mut label_index = self.label_index.write().unwrap();
+
+		// Convert HashSet to Vec for random selection
+		let mut stream_vec: Vec<_> = streams.iter().cloned().collect();
+		let target_size = current_size / 2;
+
+		// Randomly shuffle and keep only half
+		let mut rng = rand::thread_rng();
+		stream_vec.shuffle(&mut rng);
+		stream_vec.truncate(target_size as usize);
+
+		// Create new HashSet with remaining items
+		let remaining_streams: HashSet<_> = stream_vec.into_iter().collect();
+
+		// Remove items from label_index that are not in remaining_streams
+		for value_map in label_index.values_mut() {
+			for hash_set in value_map.values_mut() {
+				hash_set.retain(|hash| remaining_streams.contains(hash));
+			}
+		}
+
+		// Clean up empty entries in label_index
+		label_index.retain(|_, value_map| {
+			value_map.retain(|_, hash_set| !hash_set.is_empty());
+			!value_map.is_empty()
+		});
+
+		// Update labels_store
+		labels_store.retain(|hash, _| remaining_streams.contains(hash));
+
+		// Update streams
+		*streams = remaining_streams;
+
+		info!(
+			original_size = current_size,
+			new_size = streams.len(),
+			elapsed_ms = start_time.elapsed().as_millis(),
+			"Cleanup completed"
+		);
 	}
 }
 
@@ -75,13 +178,18 @@ impl SeriesStore for StreamStore {
 				continue;
 			}
 
+			// Check if we've reached the maximum number of streams
+			if streams.len() >= self.max_streams as usize {
+				break;
+			}
+
 			// Update inverted index
 			for (key, value) in labels.0.iter() {
 				label_index
 					.entry(key.clone())
-					.or_insert_with(HashMap::new)
+					.or_default()
 					.entry(value.clone())
-					.or_insert_with(HashSet::new)
+					.or_default()
 					.insert(hash);
 			}
 
@@ -184,7 +292,7 @@ mod tests {
 
 	#[test]
 	fn test_add_single_record() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let record = create_labels(&[
 			("env", "prod"),
 			("service", "api"),
@@ -201,7 +309,7 @@ mod tests {
 
 	#[test]
 	fn test_add_duplicate_records() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let record = create_labels(&[("env", "prod"), ("service", "api")]);
 
 		// Add the same record twice
@@ -216,7 +324,7 @@ mod tests {
 
 	#[test]
 	fn test_add_multiple_records() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 
 		let records = vec![
 			create_labels(&[("env", "prod"), ("service", "api")]),
@@ -239,7 +347,7 @@ mod tests {
 
 	#[test]
 	fn test_query_empty_conditions() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let records = vec![
 			create_labels(&[("env", "prod"), ("service", "api")]),
 			create_labels(&[("env", "dev"), ("service", "web")]),
@@ -254,7 +362,7 @@ mod tests {
 
 	#[test]
 	fn test_query_single_condition() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let records = vec![
 			create_labels(&[("env", "prod"), ("service", "api")]),
 			create_labels(&[("env", "prod"), ("service", "web")]),
@@ -273,7 +381,7 @@ mod tests {
 
 	#[test]
 	fn test_query_multiple_conditions() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let records = vec![
 			create_labels(&[
 				("env", "prod"),
@@ -303,7 +411,7 @@ mod tests {
 
 	#[test]
 	fn test_query_no_matches() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let records = vec![
 			create_labels(&[("env", "prod"), ("service", "api")]),
 			create_labels(&[("env", "dev"), ("service", "web")]),
@@ -326,7 +434,7 @@ mod tests {
 
 	#[test]
 	fn test_query_partial_matches() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let records = vec![
 			create_labels(&[
 				("env", "prod"),
@@ -360,7 +468,7 @@ mod tests {
 
 	#[test]
 	fn test_case_sensitivity() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let record = create_labels(&[("ENV", "prod"), ("Service", "API")]);
 
 		store.add(vec![record]);
@@ -378,7 +486,7 @@ mod tests {
 		use std::sync::Arc;
 		use std::thread;
 
-		let store = Arc::new(StreamStore::new());
+		let store = Arc::new(StreamStore::with_max_streams(1000));
 		let mut handles = vec![];
 
 		// Concurrent addition of records
@@ -406,7 +514,7 @@ mod tests {
 
 	#[test]
 	fn test_large_dataset() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let envs = ["prod", "staging", "dev", "test"];
 		let services = ["api", "web", "worker", "scheduler", "cache"];
 		let regions = ["us-east", "us-west", "eu-west", "eu-east", "ap-south"];
@@ -470,7 +578,7 @@ mod tests {
 
 	#[test]
 	fn test_labels_and_values() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 		let records = vec![
 			create_labels(&[
 				("env", "prod"),
@@ -523,7 +631,7 @@ mod tests {
 
 	#[test]
 	fn test_empty_store_labels() {
-		let store = StreamStore::new();
+		let store = StreamStore::with_max_streams(1000);
 
 		// Test labels() on empty store
 		let labels = store.labels();
@@ -532,5 +640,110 @@ mod tests {
 		// Test label_values() on empty store
 		let values = store.label_values("any");
 		assert!(values.is_none());
+	}
+
+	#[test]
+	fn test_stream_limit() {
+		// Create a store with max 2 streams
+		let store = StreamStore::with_max_streams(2);
+
+		let records = vec![
+			create_labels(&[("env", "prod"), ("service", "api")]),
+			create_labels(&[("env", "dev"), ("service", "web")]),
+			create_labels(&[("env", "staging"), ("service", "worker")]), // This should not be added
+		];
+
+		store.add(records);
+
+		// Verify only 2 records were added
+		let all_records = store.query(HashMap::new());
+		assert_eq!(all_records.len(), 2);
+
+		// Try to add one more record
+		store.add(vec![create_labels(&[
+			("env", "test"),
+			("service", "cache"),
+		])]);
+
+		// Verify still only 2 records exist
+		let all_records = store.query(HashMap::new());
+		assert_eq!(all_records.len(), 2);
+	}
+
+	#[tokio::test]
+	async fn test_cleanup() {
+		let store = Arc::new(StreamStore::with_max_streams(10));
+
+		// Add 8 records
+		let mut records = Vec::new();
+		for i in 0..8 {
+			records.push(create_labels(&[
+				("env", &format!("env{}", i)),
+				("service", &format!("service{}", i)),
+			]));
+		}
+		store.add(records.clone());
+
+		// Verify 8 records were added
+		let all_records = store.query(HashMap::new());
+		assert_eq!(all_records.len(), 8);
+
+		// Manually trigger cleanup with threshold of 5
+		store.cleanup_if_needed(5);
+
+		// Verify approximately half the records remain
+		let remaining_records = store.query(HashMap::new());
+		assert_eq!(remaining_records.len(), 4); // 8/2 = 4
+
+		// Verify label indexes are consistent
+		let labels = store.labels().unwrap();
+		assert!(labels.contains(&"env".to_string()));
+		assert!(labels.contains(&"service".to_string()));
+
+		// Verify we can still query by any remaining label
+		for record in remaining_records {
+			let env = record.get("env").unwrap();
+			let service = record.get("service").unwrap();
+
+			let env_query = store.query(create_labels(&[("env", env)]));
+			assert_eq!(env_query.len(), 1);
+
+			let service_query =
+				store.query(create_labels(&[("service", service)]));
+			assert_eq!(service_query.len(), 1);
+		}
+	}
+
+	#[tokio::test]
+	async fn test_cleanup_task() {
+		let store = Arc::new(StreamStore::with_max_streams(10));
+
+		// Configure cleanup with short interval
+		let config = CleanupConfig {
+			cleanup_threshold: 5,
+			cleanup_interval: Duration::from_millis(100),
+		};
+		store.start_cleanup_task(config);
+
+		// Add 8 records
+		let mut records = Vec::new();
+		for i in 0..8 {
+			records.push(create_labels(&[
+				("env", &format!("env{}", i)),
+				("service", &format!("service{}", i)),
+			]));
+		}
+		store.add(records);
+
+		// Verify 8 records were added
+		let all_records = store.query(HashMap::new());
+		assert_eq!(all_records.len(), 8);
+
+		// Wait for cleanup task to run
+		time::sleep(Duration::from_millis(500)).await;
+
+		// Verify records were cleaned up
+		let remaining_records = store.query(HashMap::new());
+		assert_eq!(remaining_records.len(), 4); // Should be cleaned up to 4 records
 	}
 }

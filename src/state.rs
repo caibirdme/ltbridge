@@ -1,6 +1,5 @@
 use crate::{
-	config,
-	metrics,
+	config, metrics,
 	storage::{log::LogStorage, trace::TraceStorage},
 };
 use moka::sync::Cache;

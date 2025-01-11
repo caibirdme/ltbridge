@@ -24,8 +24,6 @@ pub struct Cache {
 	pub time_to_live: Duration,
 	#[serde(with = "humantime_serde", default = "default_cache_duration")]
 	pub time_to_idle: Duration,
-	#[serde(with = "humantime_serde", default)]
-	pub refresh_interval: Option<Duration>,
 }
 
 fn validate_cache_config(cfg: &Cache) -> Result<(), ValidationError> {
@@ -33,13 +31,6 @@ fn validate_cache_config(cfg: &Cache) -> Result<(), ValidationError> {
 		return Err(ValidationError::new(
 			"time_to_idle must be no greater than time_to_live",
 		));
-	}
-	if let Some(interval) = cfg.refresh_interval {
-		if interval + Duration::from_secs(60) > cfg.time_to_live {
-			return Err(ValidationError::new(
-				"refresh_interval + 60s must be no greater than time_to_live",
-			));
-		}
 	}
 	Ok(())
 }
@@ -49,7 +40,6 @@ const fn default_cache() -> Cache {
 		max_capacity: default_cache_max_capacity(),
 		time_to_live: default_cache_duration(),
 		time_to_idle: default_cache_duration(),
-		refresh_interval: None,
 	}
 }
 
@@ -400,7 +390,6 @@ mod tests {
 					max_capacity: default_cache_max_capacity(),
 					time_to_live: Duration::from_secs(10 * 60),
 					time_to_idle: default_cache_duration(),
-					refresh_interval: Some(Duration::from_secs(580)),
 				},
 				1,
 			),
@@ -409,7 +398,6 @@ mod tests {
 					max_capacity: default_cache_max_capacity(),
 					time_to_live: Duration::from_secs(10 * 60),
 					time_to_idle: default_cache_duration(),
-					refresh_interval: Some(Duration::from_secs(9 * 60)),
 				},
 				0,
 			),
@@ -418,7 +406,6 @@ mod tests {
 					max_capacity: default_cache_max_capacity(),
 					time_to_live: Duration::from_secs(10 * 60),
 					time_to_idle: default_cache_duration(),
-					refresh_interval: None,
 				},
 				0,
 			),
