@@ -25,6 +25,8 @@ humantime = { version = "2.1.0" }
 chrono = { version = "0.4.39", features = ["serde"] }
 pretty_assertions = "1.4.1"
 opentelemetry-proto = { version = "0.7.0", features = ["full"] }
+tokio = { version = "1.43.0", features = ["full"] }
+tracing = { version = "0.1.41" }
 
 [dependencies]
 anyhow = "1.0.95"
@@ -61,8 +63,9 @@ serde = { version = "1.0.217", features = ["derive"] }
 serde_json = { version = "1.0.135" }
 serde_with = { version = "3.12.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
+streamstore = { path = "streamstore" }
 thiserror = { version = "2.0.9" }
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { workspace = true }
 tokio-stream = { version = "0.1.17" }
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
@@ -73,7 +76,7 @@ tower-http = { version = "0.6.2", features = [
 ] }
 tower-layer = { version = "0.3.3" }
 traceql = { path = "traceql" }
-tracing = { version = "0.1.41" }
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = [
     "default",
     "env-filter",

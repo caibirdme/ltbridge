@@ -29,7 +29,7 @@ pub fn new_router(state: state::AppState) -> Router {
 		.route("/loki/api/v1/query", get(logquery::loki_is_working))
 		.route("/loki/api/v1/labels", get(logquery::query_labels))
 		.route(
-			"/loki/api/v1/label/:label/values",
+			"/loki/api/v1/label/{label}/values",
 			get(logquery::query_label_values),
 		)
 		.route("/loki/api/v1/query_range", get(logquery::query_range))
@@ -44,13 +44,13 @@ pub fn new_router(state: state::AppState) -> Router {
 		// tempo API
 		.route("/api/status/buildinfo", get(build_info))
 		.route(
-			"/api/traces/:trace_id",
+			"/api/traces/{trace_id}",
 			get(crate::trace::get_trace_by_id),
 		)
 		.route("/api/search", get(crate::trace::search_trace_v2))
 		.route("/api/v2/search", get(crate::trace::search_trace_v2))
 		.route("/api/v2/search/tags", get(crate::trace::search_tags))
-		.route("/api/v2/search/tag/:tag_name/values", get(crate::trace::search_tag_values))
+		.route("/api/v2/search/tag/{tag_name}/values", get(crate::trace::search_tag_values))
 		// https://grafana.com/docs/tempo/latest/api_docs/#query-echo-endpoint
 		.route("/api/echo", get(|| async { "echo" }))
 		.fallback(handler_404)

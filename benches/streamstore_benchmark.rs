@@ -102,7 +102,7 @@ fn bench_concurrent(c: &mut Criterion) {
 			thread_count,
 			|b, &thread_count| {
 				b.iter(|| {
-					let store: Arc<StreamStore> = Arc::new(StreamStore::new());
+					let store: Arc<StreamStore> = StreamStore::new();
 					let mut handles = vec![];
 					let records_per_thread = 1000;
 

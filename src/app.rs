@@ -1,11 +1,11 @@
 use crate::{
 	config::AppConfig,
-	logquery, metrics, routes, state,
+	metrics, routes, state,
 	storage::{new_log_source, new_trace_source},
 };
 use anyhow::Result;
 use std::{fs::OpenOptions, sync::Arc};
-use tracing::{debug, info};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use validator::Validate;
 
@@ -37,17 +37,6 @@ pub async fn start() -> Result<()> {
 	// build our application with a route
 	let app = routes::new_router(app_state.clone());
 
-	// start a background task to refresh the series cache
-	// so that user won't wait for too long when cache is expired
-	if let Some(interval) = cfg.cache.refresh_interval {
-		tokio::spawn(async move {
-			debug!("start background task to refresh series cache");
-			logquery::labels::background_refresh_series_cache(
-				app_state, interval,
-			)
-			.await;
-		});
-	}
 	// run our app with hyper, listening globally on port 3000
 	let listener =
 		tokio::net::TcpListener::bind(cfg.server.listen_addr.clone())
