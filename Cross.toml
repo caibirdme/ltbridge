@@ -3,3 +3,6 @@ image = "caibirdme11/cross-gnu:v0.0.1"
 
 [target.x86_64-unknown-linux-musl]
 image = "caibirdme11/cross-musl:v0.0.1"
+
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
