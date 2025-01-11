@@ -138,7 +138,12 @@ impl SeriesStore for StreamStore {
     }
 
 	fn labels(&self) -> Option<Vec<String>> {
-		Some(self.label_index.read().unwrap().keys().cloned().collect())
+		let v = self.label_index.read().unwrap().keys().cloned().collect::<Vec<_>>();
+		if v.is_empty() {
+			None
+		} else {
+			Some(v)
+		}
 	}
 
 	fn label_values(&self, label: &str) -> Option<Vec<String>> {
@@ -511,11 +516,11 @@ mod tests {
         let store = StreamStore::new();
         
         // Test labels() on empty store
-        let labels = store.labels().unwrap();
-        assert!(labels.is_empty());
+        let labels = store.labels();
+        assert!(labels.is_none());
 
         // Test label_values() on empty store
         let values = store.label_values("any");
-        assert!(values.unwrap().is_empty());
+        assert!(values.is_none());
     }
 }
