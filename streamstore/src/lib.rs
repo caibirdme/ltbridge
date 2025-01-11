@@ -6,6 +6,8 @@ use std::collections::hash_map::DefaultHasher;
 pub trait SeriesStore {
     fn add(&self, records: Vec<HashMap<String, String>>);
     fn query(&self, conditions: HashMap<String, String>) -> Vec<HashMap<String, String>>;
+	fn labels(&self) -> Option<Vec<String>>;
+	fn label_values(&self, label: &str) -> Option<Vec<String>>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -134,6 +136,18 @@ impl SeriesStore for StreamStore {
             })
             .unwrap_or_default()
     }
+
+	fn labels(&self) -> Option<Vec<String>> {
+		Some(self.label_index.read().unwrap().keys().cloned().collect())
+	}
+
+	fn label_values(&self, label: &str) -> Option<Vec<String>> {
+		self.label_index.read().unwrap()
+		.get(label)
+		.map(|v| {
+			v.keys().cloned().collect::<Vec<_>>()
+		})
+	}
 }
 
 
@@ -437,5 +451,71 @@ mod tests {
         // Test all records
         let all_records = store.query(HashMap::new());
         assert_eq!(all_records.len(), 40);
+    }
+
+    #[test]
+    fn test_labels_and_values() {
+        let store = StreamStore::new();
+        let records = vec![
+            create_labels(&[
+                ("env", "prod"),
+                ("service", "api"),
+                ("region", "us-east"),
+            ]),
+            create_labels(&[
+                ("env", "dev"),
+                ("service", "web"),
+                ("region", "us-west"),
+            ]),
+            create_labels(&[
+                ("env", "prod"),
+                ("service", "worker"),
+                ("region", "eu-west"),
+            ]),
+        ];
+
+        store.add(records);
+
+        // Test labels() method
+        let labels = store.labels().unwrap();
+        assert_eq!(labels.len(), 3);
+        assert!(labels.contains(&"env".to_string()));
+        assert!(labels.contains(&"service".to_string()));
+        assert!(labels.contains(&"region".to_string()));
+
+        // Test label_values() method
+        let env_values = store.label_values("env").unwrap();
+        assert_eq!(env_values.len(), 2);
+        assert!(env_values.contains(&"prod".to_string()));
+        assert!(env_values.contains(&"dev".to_string()));
+
+        let service_values = store.label_values("service").unwrap();
+        assert_eq!(service_values.len(), 3);
+        assert!(service_values.contains(&"api".to_string()));
+        assert!(service_values.contains(&"web".to_string()));
+        assert!(service_values.contains(&"worker".to_string()));
+
+        let region_values = store.label_values("region").unwrap();
+        assert_eq!(region_values.len(), 3);
+        assert!(region_values.contains(&"us-east".to_string()));
+        assert!(region_values.contains(&"us-west".to_string()));
+        assert!(region_values.contains(&"eu-west".to_string()));
+
+        // Test non-existent label
+        let non_existent = store.label_values("non-existent");
+        assert!(non_existent.is_none());
+    }
+
+    #[test]
+    fn test_empty_store_labels() {
+        let store = StreamStore::new();
+        
+        // Test labels() on empty store
+        let labels = store.labels().unwrap();
+        assert!(labels.is_empty());
+
+        // Test label_values() on empty store
+        let values = store.label_values("any");
+        assert!(values.unwrap().is_empty());
     }
 }
