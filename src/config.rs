@@ -391,23 +391,15 @@ mod tests {
 					time_to_live: Duration::from_secs(10 * 60),
 					time_to_idle: default_cache_duration(),
 				},
+				0,
+			),
+			(
+				Cache {
+					max_capacity: default_cache_max_capacity(),
+					time_to_live: Duration::from_secs(10 * 60),
+					time_to_idle: Duration::from_secs(11 * 60),
+				},
 				1,
-			),
-			(
-				Cache {
-					max_capacity: default_cache_max_capacity(),
-					time_to_live: Duration::from_secs(10 * 60),
-					time_to_idle: default_cache_duration(),
-				},
-				0,
-			),
-			(
-				Cache {
-					max_capacity: default_cache_max_capacity(),
-					time_to_live: Duration::from_secs(10 * 60),
-					time_to_idle: default_cache_duration(),
-				},
-				0,
 			),
 		];
 		for (i, (input, expect)) in test_cases.into_iter().enumerate() {
