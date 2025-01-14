@@ -11,6 +11,7 @@ use tracing::{debug, info};
 const DEFAULT_MAX_STREAM: u64 = 600000;
 const DEFAULT_CLEANUP_THRESHOLD: u64 = 500000;
 const DEFAULT_CLEANUP_INTERVAL: Duration = Duration::from_secs(300); // 5 minutes
+const DEFAULT_STRING_POOL_CAPACITY: usize = 600000;
 
 #[derive(Clone)]
 pub struct CleanupConfig {
@@ -61,12 +62,18 @@ impl<'a> Labels<'a> {
 #[derive(Clone)]
 struct StringPool {
 	strings: Arc<DashSet<Arc<str>>>,
+	capacity: usize,
 }
 
 impl StringPool {
 	fn new() -> Self {
+		Self::with_capacity(DEFAULT_STRING_POOL_CAPACITY)
+	}
+
+	fn with_capacity(capacity: usize) -> Self {
 		Self {
 			strings: Arc::new(DashSet::new()),
+			capacity,
 		}
 	}
 
@@ -75,14 +82,27 @@ impl StringPool {
 			existing.clone()
 		} else {
 			let new_str = Arc::from(s.to_string().into_boxed_str());
-			self.strings.insert(Arc::clone(&new_str));
+			// Only insert if we haven't reached capacity
+			if self.strings.len() < self.capacity {
+				self.strings.insert(Arc::clone(&new_str));
+			}
 			new_str
 		}
 	}
 
-	// 清理没有其他引用的字符串
 	fn cleanup(&self) {
 		self.strings.retain(|s| Arc::strong_count(s) > 1);
+	}
+
+	// These methods are useful for debugging and testing
+	#[allow(dead_code)]
+	fn len(&self) -> usize {
+		self.strings.len()
+	}
+
+	#[allow(dead_code)]
+	fn capacity(&self) -> usize {
+		self.capacity
 	}
 }
 
@@ -113,6 +133,16 @@ impl StreamStore {
 			data_store: RwLock::new(HashMap::new()),
 			label_index: RwLock::new(HashMap::new()),
 			string_pool: StringPool::new(),
+			max_streams,
+		})
+	}
+
+	pub fn with_config(max_streams: u64, string_pool_capacity: usize) -> Arc<Self> {
+		Arc::new(Self {
+			streams: RwLock::new(HashSet::new()),
+			data_store: RwLock::new(HashMap::new()),
+			label_index: RwLock::new(HashMap::new()),
+			string_pool: StringPool::with_capacity(string_pool_capacity),
 			max_streams,
 		})
 	}
@@ -1051,5 +1081,102 @@ mod tests {
 
 		// Verify strings are removed from pool
 		assert_eq!(pool.strings.len(), 0, "pool should be empty after cleanup");
+	}
+
+	#[test]
+	fn test_string_pool_capacity() {
+		// Create a pool with small capacity
+		let pool = StringPool::with_capacity(2);
+		
+		// First two strings should be stored in pool
+		let s1 = pool.get_or_insert("first");
+		let _s2 = pool.get_or_insert("second");
+		
+		assert_eq!(pool.len(), 2);
+		assert!(pool.strings.contains("first" as &str));
+		assert!(pool.strings.contains("second" as &str));
+		
+		// Third string should not be stored in pool
+		let s3 = pool.get_or_insert("third");
+		
+		assert_eq!(pool.len(), 2);
+		assert!(!pool.strings.contains("third" as &str));
+		
+		// But s3 should still be usable
+		assert_eq!(&*s3, "third");
+		
+		// Getting existing strings should work
+		let s1_again = pool.get_or_insert("first");
+		assert!(Arc::ptr_eq(&s1, &s1_again));
+		
+		// After cleanup, we should be able to add new strings
+		drop(s1);
+		drop(s1_again);
+		pool.cleanup();
+		
+		// Now we should have space for one more
+		let _s4 = pool.get_or_insert("fourth");
+		assert_eq!(pool.len(), 2);
+		assert!(pool.strings.contains("fourth" as &str));
+	}
+
+	#[test]
+	fn test_streamstore_with_limited_pool() {
+		// Create store with small string pool capacity
+		let store = StreamStore::with_config(1000, 3);
+		
+		// Add records that would require more than 3 strings
+		let records = vec![
+			create_labels(&[("env", "prod"), ("service", "api")]),
+			create_labels(&[("env", "dev"), ("service", "web")]),
+			create_labels(&[("region", "us"), ("cluster", "c1")]),
+		];
+		
+		store.add(records);
+		
+		// Verify string pool didn't exceed capacity
+		assert!(store.string_pool.len() <= 3);
+		
+		// But we should still be able to query all records
+		let all_records = store.query(HashMap::new());
+		assert_eq!(all_records.len(), 3);
+		
+		// And query by any label
+		let prod_records = store.query(create_labels(&[("env", "prod")]));
+		assert_eq!(prod_records.len(), 1);
+		
+		let web_records = store.query(create_labels(&[("service", "web")]));
+		assert_eq!(web_records.len(), 1);
+	}
+
+	#[test]
+	fn test_string_pool_capacity_with_cleanup() {
+		let pool = StringPool::with_capacity(2);
+		
+		// Fill the pool
+		let s1 = pool.get_or_insert("first");
+		let s2 = pool.get_or_insert("second");
+		assert_eq!(pool.len(), 2);
+		
+		// Drop references and cleanup
+		drop(s1);
+		drop(s2);
+		pool.cleanup();
+		assert_eq!(pool.len(), 0);
+		
+		// Should be able to add new strings after cleanup
+		let _s3 = pool.get_or_insert("third");
+		let _s4 = pool.get_or_insert("fourth");
+		assert_eq!(pool.len(), 2);
+		assert!(pool.strings.contains("third" as &str));
+		assert!(pool.strings.contains("fourth" as &str));
+		
+		// Fifth string should not be stored
+		let s5 = pool.get_or_insert("fifth");
+		assert_eq!(pool.len(), 2);
+		assert!(!pool.strings.contains("fifth" as &str));
+		
+		// But s5 should still be usable
+		assert_eq!(&*s5, "fifth");
 	}
 }
