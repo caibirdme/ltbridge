@@ -27,6 +27,7 @@ pretty_assertions = "1.4.1"
 opentelemetry-proto = { version = "0.7.0", features = ["full"] }
 tokio = { version = "1.43.0", features = ["full"] }
 tracing = { version = "0.1.41" }
+dashmap = { version = "6.1.0" }
 
 [dependencies]
 anyhow = "1.0.95"
