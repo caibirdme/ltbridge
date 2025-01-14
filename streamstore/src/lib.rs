@@ -1,3 +1,4 @@
+use dashmap::DashSet;
 use rand::seq::SliceRandom;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
@@ -36,11 +37,11 @@ pub trait SeriesStore {
 	fn label_values(&self, label: &str) -> Option<Vec<String>>;
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Labels(HashMap<String, String>);
+#[derive(Clone)]
+struct Labels<'a>(&'a HashMap<String, String>);
 
-impl Labels {
-	fn new(labels: HashMap<String, String>) -> Self {
+impl<'a> Labels<'a> {
+	fn new(labels: &'a HashMap<String, String>) -> Self {
 		Labels(labels)
 	}
 
@@ -55,9 +56,33 @@ impl Labels {
 		}
 		hasher.finish()
 	}
+}
 
-	fn matches(&self, conditions: &HashMap<String, String>) -> bool {
-		conditions.iter().all(|(k, v)| self.0.get(k) == Some(v))
+#[derive(Clone)]
+struct StringPool {
+	strings: Arc<DashSet<Arc<str>>>,
+}
+
+impl StringPool {
+	fn new() -> Self {
+		Self {
+			strings: Arc::new(DashSet::new()),
+		}
+	}
+
+	fn get_or_insert(&self, s: &str) -> Arc<str> {
+		if let Some(existing) = self.strings.get(s) {
+			existing.clone()
+		} else {
+			let new_str = Arc::from(s.to_string().into_boxed_str());
+			self.strings.insert(Arc::clone(&new_str));
+			new_str
+		}
+	}
+
+	// 清理没有其他引用的字符串
+	fn cleanup(&self) {
+		self.strings.retain(|s| Arc::strong_count(s) > 1);
 	}
 }
 
@@ -65,10 +90,12 @@ impl Labels {
 pub struct StreamStore {
 	// Use HashSet to store unique label combinations
 	streams: RwLock<HashSet<u64>>,
-	// Store the actual content of label combinations
-	labels_store: RwLock<HashMap<u64, Labels>>,
-	// Inverted index: label name -> label value -> stream hash values
-	label_index: RwLock<HashMap<String, HashMap<String, HashSet<u64>>>>,
+	// Store the actual content of label combinations, using pooled strings
+	data_store: RwLock<HashMap<u64, HashMap<Arc<str>, Arc<str>>>>,
+	// Inverted index: label name -> label value -> stream hash values, using pooled strings
+	label_index: RwLock<HashMap<Arc<str>, HashMap<Arc<str>, HashSet<u64>>>>,
+	// String pool for deduplication
+	string_pool: StringPool,
 	// Maximum number of streams allowed
 	max_streams: u64,
 }
@@ -83,8 +110,9 @@ impl StreamStore {
 	pub fn with_max_streams(max_streams: u64) -> Arc<Self> {
 		Arc::new(Self {
 			streams: RwLock::new(HashSet::new()),
-			labels_store: RwLock::new(HashMap::new()),
+			data_store: RwLock::new(HashMap::new()),
 			label_index: RwLock::new(HashMap::new()),
+			string_pool: StringPool::new(),
 			max_streams,
 		})
 	}
@@ -116,11 +144,11 @@ impl StreamStore {
 			);
 			return;
 		}
-		drop(streams); // Release the read lock before getting write locks
+		drop(streams);
 
 		// Get write locks for all storage
 		let mut streams = self.streams.write().unwrap();
-		let mut labels_store = self.labels_store.write().unwrap();
+		let mut data_store = self.data_store.write().unwrap();
 		let mut label_index = self.label_index.write().unwrap();
 
 		// Convert HashSet to Vec for random selection
@@ -148,11 +176,14 @@ impl StreamStore {
 			!value_map.is_empty()
 		});
 
-		// Update labels_store
-		labels_store.retain(|hash, _| remaining_streams.contains(hash));
+		// Update data_store
+		data_store.retain(|hash, _| remaining_streams.contains(hash));
 
 		// Update streams
 		*streams = remaining_streams;
+
+		// Clean up string pool after other cleanups are done
+		self.string_pool.cleanup();
 
 		info!(
 			original_size = current_size,
@@ -165,37 +196,64 @@ impl StreamStore {
 
 impl SeriesStore for StreamStore {
 	fn add(&self, records: Vec<HashMap<String, String>>) {
+		// First compute hashes using references to avoid copying
+		let mut entries: Vec<(u64, &HashMap<String, String>)> = records
+			.iter()
+			.map(|record| {
+				let labels = Labels::new(record);
+				(labels.hash(), record)
+			})
+			.collect();
+
+		// Read lock to check existing entries and filter duplicates
+		{
+			let streams = self.streams.read().unwrap();
+			entries.retain(|(hash, _)| !streams.contains(hash));
+		}
+
+		// Early return if no new entries
+		if entries.is_empty() {
+			return;
+		}
+
+		// Now acquire write locks to update storage
 		let mut streams = self.streams.write().unwrap();
-		let mut labels_store = self.labels_store.write().unwrap();
+		let mut data_store = self.data_store.write().unwrap();
 		let mut label_index = self.label_index.write().unwrap();
 
-		for record in records {
-			let labels = Labels::new(record);
-			let hash = labels.hash();
+		// Check max streams limit
+		let available_slots = self.max_streams as usize - streams.len();
+		if available_slots == 0 {
+			return;
+		}
+		entries.truncate(available_slots);
 
-			// Skip if label combination already exists
-			if streams.contains(&hash) {
-				continue;
-			}
-
-			// Check if we've reached the maximum number of streams
-			if streams.len() >= self.max_streams as usize {
-				break;
-			}
+		// Update all storage structures
+		for (hash, record) in entries {
+			// Convert record to use pooled strings
+			let pooled_record: HashMap<Arc<str>, Arc<str>> = record
+				.iter()
+				.map(|(k, v)| {
+					(
+						self.string_pool.get_or_insert(k),
+						self.string_pool.get_or_insert(v),
+					)
+				})
+				.collect();
 
 			// Update inverted index
-			for (key, value) in labels.0.iter() {
+			for (key, value) in pooled_record.iter() {
 				label_index
-					.entry(key.clone())
+					.entry(Arc::clone(key))
 					.or_default()
-					.entry(value.clone())
+					.entry(Arc::clone(value))
 					.or_default()
 					.insert(hash);
 			}
 
-			// Store label combination
+			// Store data and hash
 			streams.insert(hash);
-			labels_store.insert(hash, labels);
+			data_store.insert(hash, pooled_record);
 		}
 	}
 
@@ -205,22 +263,38 @@ impl SeriesStore for StreamStore {
 	) -> Vec<HashMap<String, String>> {
 		if conditions.is_empty() {
 			return self
-				.labels_store
+				.data_store
 				.read()
 				.unwrap()
 				.values()
-				.map(|labels| labels.0.clone())
+				.map(|pooled_record| {
+					pooled_record
+						.iter()
+						.map(|(k, v)| (k.to_string(), v.to_string()))
+						.collect()
+				})
 				.collect();
 		}
 
 		let label_index = self.label_index.read().unwrap();
-		let labels_store = self.labels_store.read().unwrap();
+		let data_store = self.data_store.read().unwrap();
+
+		// Convert conditions to use pooled strings for lookup
+		let pooled_conditions: HashMap<Arc<str>, Arc<str>> = conditions
+			.iter()
+			.map(|(k, v)| {
+				(
+					self.string_pool.get_or_insert(k),
+					self.string_pool.get_or_insert(v),
+				)
+			})
+			.collect();
 
 		// Find stream hash set that satisfies the first condition
 		let mut result_hashes: Option<HashSet<u64>> = None;
 
 		// Use inverted index to find candidate set
-		for (key, value) in conditions.iter() {
+		for (key, value) in pooled_conditions.iter() {
 			let current_hashes = label_index
 				.get(key)
 				.and_then(|value_index| value_index.get(value))
@@ -245,9 +319,15 @@ impl SeriesStore for StreamStore {
 			.map(|hashes| {
 				hashes
 					.into_iter()
-					.filter_map(|hash| labels_store.get(&hash))
-					.filter(|labels| labels.matches(&conditions))
-					.map(|labels| labels.0.clone())
+					.filter_map(|hash| {
+						data_store.get(&hash).map(|pooled_record| {
+							// Convert back to String for return
+							pooled_record
+								.iter()
+								.map(|(k, v)| (k.to_string(), v.to_string()))
+								.collect()
+						})
+					})
 					.collect()
 			})
 			.unwrap_or_default()
@@ -259,7 +339,7 @@ impl SeriesStore for StreamStore {
 			.read()
 			.unwrap()
 			.keys()
-			.cloned()
+			.map(|k| k.to_string())
 			.collect::<Vec<_>>();
 		if v.is_empty() {
 			None
@@ -269,11 +349,12 @@ impl SeriesStore for StreamStore {
 	}
 
 	fn label_values(&self, label: &str) -> Option<Vec<String>> {
+		let pooled_label = self.string_pool.get_or_insert(label);
 		self.label_index
 			.read()
 			.unwrap()
-			.get(label)
-			.map(|v| v.keys().cloned().collect::<Vec<_>>())
+			.get(&pooled_label)
+			.map(|v| v.keys().map(|k| k.to_string()).collect::<Vec<_>>())
 	}
 }
 
@@ -745,5 +826,230 @@ mod tests {
 		// Verify records were cleaned up
 		let remaining_records = store.query(HashMap::new());
 		assert_eq!(remaining_records.len(), 4); // Should be cleaned up to 4 records
+	}
+
+	#[test]
+	fn test_string_pool_deduplication() {
+		let pool = StringPool::new();
+
+		// Test basic deduplication
+		let s1 = pool.get_or_insert("test");
+		let s2 = pool.get_or_insert("test");
+		assert!(Arc::ptr_eq(&s1, &s2));
+
+		// Verify reference counts
+		assert_eq!(Arc::strong_count(&s1), 3); // 1 in pool + 2 in s1,s2
+	}
+
+	#[test]
+	fn test_string_pool_cleanup() {
+		let pool = StringPool::new();
+
+		// Add some strings and drop their references
+		let s1 = pool.get_or_insert("temp1");
+		let s2 = pool.get_or_insert("temp2");
+		let s3 = pool.get_or_insert("keep");
+
+		// Drop s1, s2 but keep s3
+		drop(s1);
+		drop(s2);
+
+		// Cleanup should remove temp1 and temp2 but keep "keep"
+		pool.cleanup();
+
+		// Verify temp1,temp2 are removed
+		assert_eq!(pool.strings.len(), 1);
+
+		// Verify "keep" is still there
+		let s4 = pool.get_or_insert("keep");
+		assert!(Arc::ptr_eq(&s3, &s4));
+	}
+
+	#[test]
+	fn test_string_pool_with_streamstore() {
+		let store = StreamStore::with_max_streams(1000);
+		let records = vec![
+			create_labels(&[("env", "prod"), ("service", "api")]),
+			create_labels(&[("env", "prod"), ("service", "web")]),
+			create_labels(&[("env", "dev"), ("service", "api")]),
+		];
+
+		store.add(records);
+
+		// Get reference to the string pool
+		let pool = &store.string_pool;
+
+		// Verify common strings are deduplicated
+		let env_str = pool.get_or_insert("env");
+		let prod_str = pool.get_or_insert("prod");
+		let service_str = pool.get_or_insert("service");
+		let api_str = pool.get_or_insert("api");
+
+		// These strings should have multiple references since they're used in the store
+		assert!(Arc::strong_count(&env_str) > 2);
+		assert!(Arc::strong_count(&prod_str) > 2);
+		assert!(Arc::strong_count(&service_str) > 2);
+		assert!(Arc::strong_count(&api_str) > 2);
+
+		// Add same records again, should reuse existing strings
+		let old_count = Arc::strong_count(&env_str);
+		store.add(vec![create_labels(&[("env", "prod"), ("service", "api")])]);
+		assert_eq!(Arc::strong_count(&env_str), old_count); // Should not increase due to deduplication
+	}
+
+	#[test]
+	fn test_string_pool_concurrent_access() {
+		use std::thread;
+
+		let store = Arc::new(StreamStore::with_max_streams(1000));
+		let mut handles = vec![];
+
+		// Spawn multiple threads to add records concurrently
+		for i in 0..10 {
+			let store_clone = Arc::clone(&store);
+			let handle = thread::spawn(move || {
+				let record = create_labels(&[
+					("env", "prod"),
+					("service", &format!("service-{}", i)),
+					("common", "value"), // Common string across all records
+				]);
+				store_clone.add(vec![record]);
+			});
+			handles.push(handle);
+		}
+
+		// Wait for all threads
+		for handle in handles {
+			handle.join().unwrap();
+		}
+
+		// Verify common strings are properly deduplicated
+		let pool = &store.string_pool;
+		let env_str = pool.get_or_insert("env");
+		let prod_str = pool.get_or_insert("prod");
+		let common_str = pool.get_or_insert("common");
+		let value_str = pool.get_or_insert("value");
+
+		// Common strings should have 13 references:
+		// 1 in DashSet + 10 in data_store + 1 in label_index + 1 from get_or_insert
+		const EXPECTED_COMMON_COUNT: usize = 13;
+		assert_eq!(
+			Arc::strong_count(&env_str),
+			EXPECTED_COMMON_COUNT,
+			"env reference count"
+		);
+		assert_eq!(
+			Arc::strong_count(&prod_str),
+			EXPECTED_COMMON_COUNT,
+			"prod reference count"
+		);
+		assert_eq!(
+			Arc::strong_count(&common_str),
+			EXPECTED_COMMON_COUNT,
+			"common reference count"
+		);
+		assert_eq!(
+			Arc::strong_count(&value_str),
+			EXPECTED_COMMON_COUNT,
+			"value reference count"
+		);
+
+		// Service strings should have 4 references:
+		// 1 in DashSet + 1 in data_store + 1 in label_index + 1 from get_or_insert
+		const EXPECTED_SERVICE_COUNT: usize = 4;
+		for i in 0..10 {
+			let service_str = pool.get_or_insert(&format!("service-{}", i));
+			assert_eq!(
+				Arc::strong_count(&service_str),
+				EXPECTED_SERVICE_COUNT,
+				"service-{} reference count",
+				i
+			);
+		}
+
+		// Verify string pool contains all expected strings
+		assert!(pool.strings.contains("env" as &str));
+		assert!(pool.strings.contains("prod" as &str));
+		assert!(pool.strings.contains("common" as &str));
+		assert!(pool.strings.contains("value" as &str));
+		for i in 0..10 {
+			assert!(pool.strings.contains(&format!("service-{}", i) as &str));
+		}
+	}
+
+	#[test]
+	fn test_string_pool_lifecycle() {
+		let store = Arc::new(StreamStore::with_max_streams(1000));
+
+		// First insert some records
+		let records = vec![
+			create_labels(&[("env", "prod"), ("service", "api")]),
+			create_labels(&[("env", "prod"), ("service", "web")]),
+			create_labels(&[("env", "dev"), ("service", "api")]),
+		];
+		store.add(records);
+
+		// Get references and verify counts
+		let pool = &store.string_pool;
+		let env_str = pool.get_or_insert("env");
+		let prod_str = pool.get_or_insert("prod");
+		let api_str = pool.get_or_insert("api");
+
+		// env: 1 in DashSet + 3 in data_store + 1 in label_index + 1 from get_or_insert = 6
+		assert_eq!(Arc::strong_count(&env_str), 6, "env count after insertion");
+		// prod: 1 in DashSet + 2 in data_store + 1 in label_index + 1 from get_or_insert = 5
+		assert_eq!(
+			Arc::strong_count(&prod_str),
+			5,
+			"prod count after insertion"
+		);
+		// api: 1 in DashSet + 2 in data_store + 1 in label_index + 1 from get_or_insert = 5
+		assert_eq!(Arc::strong_count(&api_str), 5, "api count after insertion");
+
+		// Drop our references
+		drop(env_str);
+		drop(prod_str);
+		drop(api_str);
+
+		// Manually clear all data
+		{
+			let mut streams = store.streams.write().unwrap();
+			let mut data_store = store.data_store.write().unwrap();
+			let mut label_index = store.label_index.write().unwrap();
+
+			streams.clear();
+			data_store.clear();
+			label_index.clear();
+		}
+
+		// Get new references and verify counts
+		let env_str = pool.get_or_insert("env");
+		let prod_str = pool.get_or_insert("prod");
+		let api_str = pool.get_or_insert("api");
+
+		// After clearing data, only DashSet reference + our get_or_insert should remain
+		assert_eq!(Arc::strong_count(&env_str), 2, "env count after clearing");
+		assert_eq!(
+			Arc::strong_count(&prod_str),
+			2,
+			"prod count after clearing"
+		);
+		assert_eq!(Arc::strong_count(&api_str), 2, "api count after clearing");
+
+		// Verify the strings are still in the pool
+		assert!(pool.strings.contains("env" as &str));
+		assert!(pool.strings.contains("prod" as &str));
+		assert!(pool.strings.contains("api" as &str));
+
+		// Drop references again
+		drop(env_str);
+		drop(prod_str);
+		drop(api_str);
+
+		// Clean string pool
+		pool.cleanup();
+
+		// Verify strings are removed from pool
+		assert_eq!(pool.strings.len(), 0, "pool should be empty after cleanup");
 	}
 }
