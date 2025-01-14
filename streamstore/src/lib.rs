@@ -106,14 +106,21 @@ impl StringPool {
 	}
 }
 
+// Type aliases to simplify complex types
+type PooledString = Arc<str>;
+type LabelMap = HashMap<PooledString, PooledString>;
+type DataStore = RwLock<HashMap<u64, LabelMap>>;
+type ValueMap = HashMap<PooledString, HashSet<u64>>;
+type LabelIndex = RwLock<HashMap<PooledString, ValueMap>>;
+
 /// Stream storage implementation
 pub struct StreamStore {
 	// Use HashSet to store unique label combinations
 	streams: RwLock<HashSet<u64>>,
 	// Store the actual content of label combinations, using pooled strings
-	data_store: RwLock<HashMap<u64, HashMap<Arc<str>, Arc<str>>>>,
+	data_store: DataStore,
 	// Inverted index: label name -> label value -> stream hash values, using pooled strings
-	label_index: RwLock<HashMap<Arc<str>, HashMap<Arc<str>, HashSet<u64>>>>,
+	label_index: LabelIndex,
 	// String pool for deduplication
 	string_pool: StringPool,
 	// Maximum number of streams allowed
