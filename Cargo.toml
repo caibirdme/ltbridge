@@ -36,8 +36,8 @@ axum = { version = "0.8.1", features = ["default"] }
 bytes = "1.9.0"
 chrono = { workspace = true }
 common = { path = "common" }
-config = { version = "0.15.4" }
-dashmap = "5.5.3"
+config = { version = "0.15.5" }
+dashmap = "6.1.0"
 databend-driver = { version = "0.25.0" }
 dyn-clone = "1.0.17"
 flate2 = "1.0.35"
@@ -65,7 +65,7 @@ serde_json = { version = "1.0.135" }
 serde_with = { version = "3.12.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
 streamstore = { path = "streamstore" }
-thiserror = { version = "2.0.9" }
+thiserror = { version = "2.0.11" }
 tokio = { workspace = true }
 tokio-stream = { version = "0.1.17" }
 tower = { version = "0.5.2" }
