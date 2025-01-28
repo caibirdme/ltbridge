@@ -64,10 +64,10 @@ impl<T: TableSchema> QueryConverter for CKLogConverter<T> {
 		let ts = t.and_utc().timestamp();
 		match o {
 			OrdType::LargerEqual => {
-				format!("{}>=toDateTime64({}, 9)", ts_key, ts)
+				format!("{}>=toDateTime({})", "TimestampTime".to_string(), ts)
 			}
 			OrdType::SmallerEqual => {
-				format!("{}<=toDateTime64({}, 9)", ts_key, ts)
+				format!("{}<=toDateTime({})", "TimestampTime".to_string(), ts)
 			}
 		}
 	}

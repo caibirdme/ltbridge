@@ -26,35 +26,35 @@ use tracing::{error, info};
 pub fn to_start_interval(step: Duration) -> &'static str {
 	let sec = step.as_secs();
 	if sec < 5 {
-		"toStartOfSecond(Timestamp) as Tts"
+		"TimestampTime as Tts"
 	} else if sec < 10 {
-		"toStartOfInterval(Timestamp, INTERVAL 5 SECOND) as Tts"
+		"toStartOfInterval(TimestampTime, INTERVAL 5 SECOND) as Tts"
 	} else if sec < 15 {
-		"toStartOfInterval(Timestamp, INTERVAL 10 SECOND) as Tts"
+		"toStartOfInterval(TimestampTime, INTERVAL 10 SECOND) as Tts"
 	} else if sec < 60 {
-		"toStartOfInterval(Timestamp, INTERVAL 30 SECOND) as Tts"
+		"toStartOfInterval(TimestampTime, INTERVAL 30 SECOND) as Tts"
 	} else if sec < 5 * 60 {
-		"toStartOfMinute(Timestamp) as Tts"
+		"toStartOfMinute(TimestampTime) as Tts"
 	} else if sec < 10 * 60 {
-		"toStartOfFiveMinutes(Timestamp) as Tts"
+		"toStartOfFiveMinutes(TimestampTime) as Tts"
 	} else if sec < 30 * 60 {
-		"toStartOfTenMinutes(Timestamp) as Tts"
+		"toStartOfTenMinutes(TimestampTime) as Tts"
 	} else if sec < 60 * 60 {
-		"toStartOfInterval(Timestamp, INTERVAL 30 MINUTE) as Tts"
+		"toStartOfInterval(TimestampTime, INTERVAL 30 MINUTE) as Tts"
 	} else if sec < 2 * 60 * 60 {
-		"toStartOfHour(Timestamp) as Tts"
+		"toStartOfHour(TimestampTime) as Tts"
 	} else if sec < 24 * 60 * 60 {
-		"toStartOfInterval(Timestamp, INTERVAL 2 HOUR) as Tts"
+		"toStartOfInterval(TimestampTime, INTERVAL 2 HOUR) as Tts"
 	} else if sec < 7 * 24 * 60 * 60 {
-		"toStartOfDay(Timestamp) as Tts"
+		"toStartOfDay(TimestampTime) as Tts"
 	} else if sec < 30 * 24 * 60 * 60 {
 		// Set Monday is the first day of a week
 		// https://clickhouse.com/docs/en/sql-reference/functions/date-time-functions#toweek
-		"toStartOfWeek(Timestamp, 1) as Tts"
+		"toStartOfWeek(TimestampTime, 1) as Tts"
 	} else if sec < 365 * 24 * 60 * 60 {
-		"toStartOfMonth(Timestamp) as Tts"
+		"toStartOfMonth(TimestampTime) as Tts"
 	} else {
-		"toStartOfYear(Timestamp) as Tts"
+		"toStartOfYear(TimestampTime) as Tts"
 	}
 }
 
