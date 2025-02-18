@@ -1808,7 +1808,7 @@ dependencies = [
  "fast-float2",
  "itoa",
  "nom",
- "ordered-float",
+ "ordered-float 4.6.0",
  "rand",
  "ryu",
  "serde_json",
@@ -1981,7 +1981,7 @@ dependencies = [
  "opentelemetry-proto",
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk 0.27.1",
- "ordered-float",
+ "ordered-float 5.0.0",
  "pretty_assertions",
  "prometheus",
  "prost",
@@ -2402,6 +2402,15 @@ name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "ordered-float"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2c1f9f56e534ac6a9b8a4600bdf0f530fb393b5f393e7b4d03489c3cf0c3f01"
 dependencies = [
  "num-traits",
 ]
@@ -3405,7 +3414,7 @@ dependencies = [
  "itertools 0.14.0",
  "logql",
  "opentelemetry-proto",
- "ordered-float",
+ "ordered-float 5.0.0",
  "traceql",
 ]
 
@@ -3851,7 +3860,7 @@ version = "0.1.0"
 dependencies = [
  "humantime",
  "nom",
- "ordered-float",
+ "ordered-float 5.0.0",
  "pretty_assertions",
 ]
 
