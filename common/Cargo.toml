@@ -6,5 +6,5 @@ rust-version = "1.76.0"
 authors = ["caibirdme <492877816@qq.com>"]
 
 [dependencies]
-anyhow = { version = "1.0.95" }
+anyhow = { version = "1.0.96" }
 chrono = { workspace = true }
