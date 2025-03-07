@@ -20,7 +20,7 @@ members = [
 nom ={ version = "7.1.3" }
 humantime-serde = { version = "1.1.1" }
 itertools = { version = "0.14.0" }
-ordered-float = { version = "4.6.0" }
+ordered-float = { version = "5.0.0" }
 humantime = { version = "2.1.0" }
 chrono = { version = "0.4.39", features = ["serde"] }
 pretty_assertions = "1.4.1"
@@ -30,8 +30,8 @@ tracing = { version = "0.1.41" }
 dashmap = { version = "6.1.0" }
 
 [dependencies]
-anyhow = "1.0.95"
-async-trait = "0.1.86"
+anyhow = "1.0.96"
+async-trait = "0.1.87"
 axum = { version = "0.8.2", features = ["default"] }
 bytes = "1.10.0"
 chrono = { workspace = true }
@@ -40,7 +40,7 @@ config = { version = "0.15.8" }
 dashmap = "6.1.0"
 databend-driver = { version = "0.25.6" }
 dyn-clone = "1.0.18"
-flate2 = "1.0.35"
+flate2 = "1.1.0"
 hex = { version = "0.4.3" }
 http = "1.2.0"
 humantime-serde = { version = "1.1.1" }
@@ -53,19 +53,19 @@ opentelemetry-prometheus = "0.27.0"
 opentelemetry-proto = { workspace = true }
 opentelemetry-semantic-conventions = { version = "0.28.0" }
 opentelemetry_sdk = { version = "0.27.1", features = ["metrics"] }
-ordered-float = { version = "4.6.0" }
+ordered-float = { version = "5.0.0" }
 prometheus = "0.13.4"
 prost = { version = "0.13.5" }
 regex = "1.11.1"
 reqwest = { version = "0.12.12", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
-reqwest-middleware = "0.4.0"
+reqwest-middleware = "0.4.1"
 rmp-serde = "1.3.0"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = { version = "1.0.138" }
+serde = { version = "1.0.218", features = ["derive"] }
+serde_json = { version = "1.0.139" }
 serde_with = { version = "3.12.0", features = ["json"] }
 sqlbuilder = { path = "sqlbuilder" }
 streamstore = { path = "streamstore" }
-thiserror = { version = "2.0.11" }
+thiserror = { version = "2.0.12" }
 tokio = { workspace = true }
 tokio-stream = { version = "0.1.17" }
 tower = { version = "0.5.2" }
@@ -95,7 +95,7 @@ sqlparser = "0.53.0"
 streamstore = { path = "streamstore" }
 
 [build-dependencies]
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 prost-build = { version = "0.13.5", features = ["default", "cleanup-markdown"] }
 
 [[bench]]
