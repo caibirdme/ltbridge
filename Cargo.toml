@@ -39,7 +39,7 @@ common = { path = "common" }
 config = { version = "0.15.9" }
 dashmap = "6.1.0"
 databend-driver = { version = "0.25.6" }
-dyn-clone = "1.0.18"
+dyn-clone = "1.0.19"
 flate2 = "1.1.0"
 hex = { version = "0.4.3" }
 http = "1.2.0"
