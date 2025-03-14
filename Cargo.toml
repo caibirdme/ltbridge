@@ -36,7 +36,7 @@ axum = { version = "0.8.2", features = ["default"] }
 bytes = "1.10.1"
 chrono = { workspace = true }
 common = { path = "common" }
-config = { version = "0.15.9" }
+config = { version = "0.15.11" }
 dashmap = "6.1.0"
 databend-driver = { version = "0.25.6" }
 dyn-clone = "1.0.19"
