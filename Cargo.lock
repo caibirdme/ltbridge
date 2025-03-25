@@ -1982,7 +1982,7 @@ dependencies = [
  "lazy_static",
  "logql",
  "moka",
- "opentelemetry 0.27.1",
+ "opentelemetry 0.29.0",
  "opentelemetry-prometheus",
  "opentelemetry-proto",
  "opentelemetry-semantic-conventions",
@@ -2328,6 +2328,20 @@ dependencies = [
  "js-sys",
  "pin-project-lite",
  "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "opentelemetry"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "768ee97dc5cd695a4dd4a69a0678fb42789666b5a89e8c0af48bb06c6e427120"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "pin-project-lite",
+ "thiserror 2.0.12",
  "tracing",
 ]
 
