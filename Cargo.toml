@@ -30,7 +30,7 @@ tracing = { version = "0.1.41" }
 dashmap = { version = "6.1.0" }
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 async-trait = "0.1.88"
 axum = { version = "0.8.3", features = ["default"] }
 bytes = "1.10.1"
@@ -95,7 +95,7 @@ sqlparser = "0.55.0"
 streamstore = { path = "streamstore" }
 
 [build-dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 prost-build = { version = "0.13.5", features = ["default", "cleanup-markdown"] }
 
 [[bench]]
