@@ -69,7 +69,7 @@ thiserror = { version = "2.0.12" }
 tokio = { workspace = true }
 tokio-stream = { version = "0.1.17" }
 tower = { version = "0.5.2" }
-tower-http = { version = "0.6.5", features = [
+tower-http = { version = "0.6.6", features = [
     "trace",
     "timeout",
     "compression-gzip",
