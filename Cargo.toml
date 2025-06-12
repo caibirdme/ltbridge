@@ -54,7 +54,7 @@ opentelemetry-proto = { workspace = true }
 opentelemetry-semantic-conventions = { version = "0.30.0" }
 opentelemetry_sdk = { version = "0.27.1", features = ["metrics"] }
 ordered-float = { version = "5.0.0" }
-prometheus = "0.13.4"
+prometheus = "0.14.0"
 prost = { version = "0.13.5" }
 regex = "1.11.1"
 reqwest = { version = "0.12.20", features = ["json", "native-tls-vendored", "gzip"], default-features = false }
