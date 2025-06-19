@@ -96,7 +96,7 @@ streamstore = { path = "streamstore" }
 
 [build-dependencies]
 anyhow = "1.0.98"
-prost-build = { version = "0.14.0", features = ["default", "cleanup-markdown"] }
+prost-build = { version = "0.14.1", features = ["default", "cleanup-markdown"] }
 
 [[bench]]
 name = "streamstore_benchmark"
