@@ -91,7 +91,7 @@ criterion = { version = "0.6", features = ["html_reports"] }
 pretty_assertions = { workspace = true }
 serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
-sqlparser = "0.56.0"
+sqlparser = "0.57.0"
 streamstore = { path = "streamstore" }
 
 [build-dependencies]
