@@ -138,7 +138,7 @@ impl CKLogQuerier {
 			"SELECT {} FROM {} WHERE {} >= now() - INTERVAL 5 MINUTE LIMIT 3000",
 			self.schema.projection().join(","),
 			self.schema.table(),
-			self.schema.ts_key(),
+			"TimestampTime".to_string(),
 		);
 		let rows =
 			send_query(self.cli.clone(), self.ck_cfg.common.clone(), sql)
